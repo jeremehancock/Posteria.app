@@ -738,7 +738,14 @@
         <div class="container">
             <p>Support the development:</p>
             <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="margin-top: 20px;" target="_blank">Donate</a>
-            <p style="margin-top: 20px;">© 2025 Posteria. MIT License.</p>
+            <p style="margin-top: 20px;">
+			<script>
+				const startYear = 2025; 
+				const today = new Date();
+				const currentYear = today.getFullYear();
+				document.write('© ' + (currentYear === startYear ? startYear : startYear + '-' + currentYear));
+			</script>
+            Posteria. MIT License.</p>
         </div>
     </footer>
 
