@@ -10,10 +10,10 @@
     <meta property="og:url" content="https://posteria.app" />
     <meta property="og:image" content="https://posteria.app/assets/web-app-manifest-512x512.png" />
     <link rel="icon" type="image/png" href="/assets/favicon-96x96.png" sizes="96x96" />
-	<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
-	<link rel="shortcut icon" href="./assets/favicon.ico" />
-	<link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
-	<meta name="apple-mobile-web-app-title" content="Posteria" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+    <link rel="shortcut icon" href="./assets/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Posteria" />
     <style>
         :root {
             --primary: #f5a623;
@@ -64,16 +64,15 @@
         .logo {
             display: flex;
             align-items: center;
-            font-size: 24px;
+            font-size: 48px;
             font-weight: bold;
             color: var(--primary);
             text-decoration: none;
-            gap: 10px;
             z-index: 101;
         }
 
         .logo svg {
-            height: 40px;
+            height: 80px;
             width: auto;
         }
 
@@ -179,54 +178,53 @@
             white-space: nowrap;
         }
         
-		.code-wrapper {
-			position: relative;
-		}
+        .code-wrapper {
+            position: relative;
+        }
 
-		.code-wrapper pre {
-			margin: 0;
-			padding: 0;
-		}
+        .code-wrapper pre {
+            margin: 0;
+            padding: 0;
+        }
 
-		.code-wrapper code {
-			display: block;
-			white-space: pre;
-			tab-size: 2;
-		}
+        .code-wrapper code {
+            display: block;
+            white-space: pre;
+            tab-size: 2;
+        }
 
-		/* Keep your existing copy-button styles */
-		.copy-button {
-			position: absolute;
-			top: 10px;
-			right: 10px;
-			background: var(--gray);
-			border: none;
-			border-radius: 4px;
-			padding: 6px 12px;
-			color: var(--light);
-			cursor: pointer;
-			font-size: 14px;
-			transition: background 0.3s;
-			display: flex;
-			align-items: center;
-			gap: 6px;
-		}
+        .copy-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--gray);
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            color: var(--light);
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-		.copy-button:hover {
-			background: var(--primary);
-			color: var(--dark);
-		}
+        .copy-button:hover {
+            background: var(--primary);
+            color: var(--dark);
+        }
 
-		.copy-button svg {
-			width: 14px;
-			height: 14px;
-		}
-		
-		.code-wrapper pre,
-		.code-wrapper code {
-			margin: 0;
-			display: block;
-		}
+        .copy-button svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .code-wrapper pre,
+        .code-wrapper code {
+            margin: 0;
+            display: block;
+        }
 
         .features {
             padding: 80px 0;
@@ -289,12 +287,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             display: block;
             margin: 0 auto;
-        }
-
-        .coming-soon {
-            padding: 80px 0;
-            text-align: center;
-            background: var(--dark);
         }
 
         .features .section-title {
@@ -434,6 +426,10 @@
         }
 
         @media (max-width: 768px) {
+        
+		    .hero {
+		        padding: 100px 0 80px;
+		    }
             .hero h1 {
                 font-size: 32px;
             }
@@ -467,14 +463,10 @@
             }
             
             .search-bar {
-                flex-direction: column;
+                flex-direction: row;
             }
             
-            .search-bar input,
-            .search-bar button {
-                width: 100%;
-            }
-            
+
             .poster-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -500,19 +492,20 @@
                 overflow-x: auto;
                 white-space: nowrap;
             }
-            
-            .coming-soon .features-grid {
-                grid-template-columns: 1fr !important;
-            }
         }
 
         @media (max-width: 480px) {
+        
+		    .hero {
+		        padding: 100px 0 80px;
+		    }
+        
             .hero h1 {
                 font-size: 28px;
             }
             
             .poster-grid {
-    			grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(2, 1fr);
                 gap: 15px;
             }
             
@@ -521,17 +514,73 @@
             }
             
             .logo svg {
-                height: 30px;
+                height: 50px;
             }
             
             .logo {
-                font-size: 20px;
+                font-size: 30px;
             }
             
             .feature-card {
                 padding: 20px;
             }
         }
+        
+		@media (max-width: 768px) {
+			.nav-links a {
+				font-size: 24px;
+				padding: 15px 30px;
+
+				text-align: center;
+				border-radius: 8px;
+			}
+
+			.nav-links .external-link svg {
+				width: 18px;
+				height: 18px;
+			}
+
+			.nav-links {
+				gap: 25px;
+			}
+			#support .features-grid {
+				grid-template-columns: 1fr !important;
+				gap: 20px !important;
+				padding: 0 20px;
+			}
+
+			#support .feature-card {
+				text-align: center;
+			}
+
+			#support .cta-button {
+				width: 100%;
+				text-align: center;
+				margin-top: 15px !important;
+			}
+
+			#support .features {
+				padding: 30px 0 !important;
+			}
+		}
+
+		@media (max-width: 480px) {
+			#support .feature-card {
+				padding: 20px 15px;
+			}
+
+			#support .feature-icon {
+				font-size: 28px;
+			}
+
+			#support h3 {
+				font-size: 18px;
+			}
+
+			#support p {
+				font-size: 14px;
+			}
+		}
     </style>
 </head>
 <body>
@@ -617,8 +666,8 @@
             <div style="max-width: 800px; margin: 0 auto;">
                 <div class="feature-card" style="margin-bottom: 30px;">
                     <h3>1. Create docker-compose.yml</h3>
-					<div class="code-wrapper">
-					<pre><code>services:
+                    <div class="code-wrapper">
+                    <pre><code>services:
   posteria:
     image: bozodev/posteria:latest
     container_name: posteria
@@ -637,26 +686,26 @@
       - ./posters/tv-seasons:/var/www/html/posters/tv-seasons
       - ./posters/collections:/var/www/html/posters/collections
     restart: unless-stopped</code></pre>
-						<button class="copy-button">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-							</svg>
-							Copy
-						</button>
-					</div>
+                        <button class="copy-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="feature-card" style="margin-bottom: 30px;">
                     <h3>2. Start the Container</h3>
-					<div class="code-wrapper">
-						<pre><code>docker-compose up -d</code></pre>
-						<button class="copy-button">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-							</svg>
-							Copy
-						</button>
-					</div>
+                    <div class="code-wrapper">
+                        <pre><code>docker-compose up -d</code></pre>
+                        <button class="copy-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
                     <p style="margin-top: 15px;">That's it! Access Posteria at <code style="background: var(--darker); padding: 4px 8px; border-radius: 4px;">http://your-server:8181</code></p>
                 </div>
 
@@ -706,29 +755,20 @@
         </div>
     </section>
 
-    <section id="coming-soon" class="coming-soon">
+    <section id="support" class="features" style="padding: 40px 0;">
         <div class="container">
-            <h2 class="section-title">Hosted Version Coming Soon</h2>
-            <div style="max-width: 800px; margin: 0 auto; text-align: left;">
-                <div class="feature-card" style="margin-bottom: 20px;">
-                    <h3>Why Choose Hosted Posteria?</h3>
-                    <p>Our upcoming hosted solution offers all the power of Posteria with none of the setup hassle. Perfect for users who want to focus on their media collection rather than server management.</p>
+            <div class="features-grid" style="grid-template-columns: repeat(2, 1fr); gap: 30px;">
+                <div class="feature-card">
+                    <div class="feature-icon">❤️</div>
+                    <h3>Support Development</h3>
+                    <p>If you find Posteria useful in managing your media poster collection, please consider making a donation to support ongoing development and maintenance.</p>
+                    <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="margin-top: 20px; display: inline-block;" target="_blank">Make a Donation</a>
                 </div>
-                <div class="features-grid" style="grid-template-columns: repeat(2, 1fr); margin-top: 30px;">
-                    <div class="feature-card">
-                        <div class="feature-icon">☁️</div>
-                        <h3>Cloud Storage</h3>
-                        <p>Your posters securely stored in the cloud with automated backups</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">🚀</div>
-                        <h3>Instant Setup</h3>
-                        <p>No Docker, no configuration - just sign up and start organizing</p>
-                    </div>
-                </div>
-                <div class="feature-card" style="margin-top: 30px;">
-                    <h3>Launch Timeline</h3>
-                    <p>The hosted version is currently in development and scheduled for beta release in Q2 2025. Follow our GitHub repository for the latest updates and announcements.</p>
+                <div class="feature-card">
+                    <div class="feature-icon">☁️</div>
+                    <h3>Hosted Solution</h3>
+                    <p>Need a managed hosting solution? We offer hosted instances of Posteria for users who prefer a hands-off approach. Get in touch to learn more.</p>
+                    <a href="mailto:hosting@posteria.app?subject=Hosted%20Posteria%20Inquiry" class="cta-button" style="margin-top: 20px; display: inline-block;">Request Info</a>
                 </div>
             </div>
         </div>
@@ -736,15 +776,13 @@
 
     <footer>
         <div class="container">
-            <p>Support the development:</p>
-            <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="margin-top: 20px;" target="_blank">Donate</a>
-            <p style="margin-top: 20px;">
-			<script>
-				const startYear = 2025; 
-				const today = new Date();
-				const currentYear = today.getFullYear();
-				document.write('© ' + (currentYear === startYear ? startYear : startYear + '-' + currentYear));
-			</script>
+            <p>
+            <script>
+                const startYear = 2025; 
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                document.write('© ' + (currentYear === startYear ? startYear : startYear + '-' + currentYear));
+            </script>
             Posteria. MIT License.</p>
         </div>
     </footer>
@@ -947,65 +985,65 @@
         });
 
         // Handle window resize
-		function handleResize() {
-			const posterGrid = document.querySelector('.poster-grid');
-			if (!posterGrid) return;
+        function handleResize() {
+            const posterGrid = document.querySelector('.poster-grid');
+            if (!posterGrid) return;
 
-			if (window.innerWidth <= 480) {
-    			posterGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
-			} else if (window.innerWidth <= 768) {
-				posterGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
-			} else if (window.innerWidth <= 1024) {
-				posterGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-			} else {
-				posterGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
-			}
-		}
+            if (window.innerWidth <= 480) {
+                posterGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            } else if (window.innerWidth <= 768) {
+                posterGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            } else if (window.innerWidth <= 1024) {
+                posterGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+            } else {
+                posterGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+            }
+        }
 
         window.addEventListener('resize', handleResize);
         handleResize(); // Initial call
         
-		// Copy to clipboard functionality
-		document.querySelectorAll('.copy-button').forEach(button => {
-			button.addEventListener('click', async () => {
-				const codeBlock = button.parentElement.querySelector('code');
-				const text = codeBlock.textContent;
-				
-				try {
-				    await navigator.clipboard.writeText(text);
-				    
-				    // Update button text temporarily
-				    const originalHTML = button.innerHTML;
-				    button.innerHTML = `
-				        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-				        </svg>
-				        Copied!
-				    `;
-				    
-				    // Reset button after 2 seconds
-				    setTimeout(() => {
-				        button.innerHTML = originalHTML;
-				    }, 2000);
-				} catch (err) {
-				    console.error('Failed to copy text:', err);
-				    
-				    // Show error state
-				    const originalHTML = button.innerHTML;
-				    button.innerHTML = `
-				        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				        </svg>
-				        Error!
-				    `;
-				    
-				    // Reset button after 2 seconds
-				    setTimeout(() => {
-				        button.innerHTML = originalHTML;
-				    }, 2000);
-				}
-			});
-		});
+        // Copy to clipboard functionality
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', async () => {
+                const codeBlock = button.parentElement.querySelector('code');
+                const text = codeBlock.textContent;
+                
+                try {
+                    await navigator.clipboard.writeText(text);
+                    
+                    // Update button text temporarily
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Copied!
+                    `;
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy text:', err);
+                    
+                    // Show error state
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Error!
+                    `;
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                }
+            });
+        });
     </script>
 </body>
 </html>
