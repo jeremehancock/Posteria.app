@@ -22,6 +22,7 @@
             --light: #ffffff;
             --gray: #2a2a2a;
             --text-gray: #888888;
+            scroll-padding-top: 40px;
         }
 
         * {
@@ -129,7 +130,7 @@
         }
 
         .hero {
-            padding: 140px 0 80px;
+            padding: 140px 0 50px;
             text-align: center;
             background: var(--dark);
         }
@@ -225,9 +226,13 @@
             margin: 0;
             display: block;
         }
+        
+	   #quick-installation {
+	   		padding-top: 100px;
+	   }
 
         .features {
-            padding: 80px 0;
+            padding-top: 100px;
             background: var(--darker);
         }
 
@@ -249,7 +254,7 @@
         .feature-card:hover {
             transform: translateY(-5px);
         }
-
+        
         .feature-icon {
             font-size: 32px;
             margin-bottom: 20px;
@@ -262,11 +267,6 @@
 
         .feature-card p {
             color: var(--text-gray);
-        }
-
-        .installation {
-            margin-bottom: 50px;
-            padding: 0 20px;
         }
 
         .screenshot {
@@ -289,19 +289,10 @@
             margin: 0 auto;
         }
 
-        .features .section-title {
-            margin-top: 50px;
-        }
-
-        .quick {
-            padding-top: 140px;
-        }
-
         .section-title {
             text-align: center;
             margin-bottom: 40px;
             color: var(--primary);
-            padding: 0 20px;
         }
 
         .category-tabs {
@@ -427,8 +418,16 @@
 
         @media (max-width: 768px) {
         
+		     #quick-installation {
+		   		padding-top: 80px;
+		     }
+
+		    .features {
+		        padding-top: 80px;
+		    }
+        
 		    .hero {
-		        padding: 100px 0 80px;
+		        padding: 100px 0 50px;
 		    }
             .hero h1 {
                 font-size: 32px;
@@ -496,8 +495,16 @@
 
         @media (max-width: 480px) {
         
+		     #quick-installation {
+		   		padding-top: 80px;
+		     }
+
+		    .features {
+		        padding-top: 80px;
+		    }
+        
 		    .hero {
-		        padding: 100px 0 80px;
+		        padding: 100px 0 50px;
 		    }
         
             .hero h1 {
@@ -608,7 +615,7 @@
 				</a>
 				<a href="#features">Features</a>
 				<a href="#support">Donate</a>
-				<a href="#installation" class="primary">Get Started</a>
+				<a href="#quick-installation" class="primary">Get Started</a>
 			</div>
         </nav>
     </header>
@@ -661,9 +668,9 @@
         </div>
     </section>
 
-    <section id="installation" class="installation">
+    <section id="quick-installation" class="installation">
         <div class="container">
-            <h2 class="section-title quick">Quick Installation</h2>
+            <h2 class="section-title">Quick Installation</h2>
             <div style="max-width: 800px; margin: 0 auto;">
                 <div class="feature-card" style="margin-bottom: 30px;">
                     <h3>1. Create docker-compose.yml</h3>
@@ -710,7 +717,7 @@
                     <p style="margin-top: 15px;">That's it! Access Posteria at <code style="background: var(--darker); padding: 4px 8px; border-radius: 4px;">http://your-server:8181</code></p>
                 </div>
 
-                <div class="feature-card">
+                <div class="feature-card config">
                     <h3>Configuration Options</h3>
                     <div style="margin-top: 15px; overflow-x: auto;">
                         <table>
@@ -968,14 +975,19 @@
         });
 
         // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
-            });
-        });
+		document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+			anchor.addEventListener('click', function (e) {
+				e.preventDefault();
+				const targetId = this.getAttribute('href').slice(1);
+				const targetElement = document.getElementById(targetId);
+				
+				if (targetElement) {
+				    targetElement.scrollIntoView({
+				        behavior: 'smooth'
+				    });
+				}
+			});
+		});
 
         // Close mobile menu when clicking a link
         navLinks.querySelectorAll('a').forEach(link => {
