@@ -277,8 +277,8 @@
         }
 
         .features-grid {
-            display: flex;
-            width: 70%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 30px;
             margin-top: 40px;
             padding: 0 20px;
@@ -289,6 +289,13 @@
             background: var(--dark);
             border-radius: 10px;
             transition: transform 0.3s;
+        }
+        
+        .donate {
+            display: flex;
+            width: 70%;
+            gap: 30px;
+            padding: 0 20px;
         }
 
         .feature-card:hover {
@@ -458,6 +465,10 @@
 
         @media (max-width: 768px) {
         
+		    .donate {
+		        width: 100%;
+		    }
+        
 		     #quick-installation {
 		   		padding-top: 80px;
 		     }
@@ -515,7 +526,7 @@
             }
             
             .features-grid {
-                width: 100%;
+                grid-template-columns: 1fr;
             }
             
             .screenshot {
@@ -534,6 +545,10 @@
         }
 
         @media (max-width: 480px) {
+        
+            .donate {
+		        width: 100%;
+		    }
         
 		     #quick-installation {
 		   		padding-top: 80px;
@@ -571,9 +586,6 @@
             .feature-card {
                 padding: 20px;
             }
-            .features-grid {
-            	width: 100%;
-        	}
         }
         
 		@media (max-width: 768px) {
@@ -599,13 +611,8 @@
 				padding: 0 20px;
 			}
 
-			#support .feature-card {
-				text-align: center;
-			}
-
 			#support .cta-button {
 				width: 100%;
-				text-align: center;
 				margin-top: 15px !important;
 			}
 
@@ -808,14 +815,12 @@
 
     <section id="support" class="features" style="padding: 40px 0;">
         <div class="container" style="display: flex; justify-content: center; align-items: center;">
-            <div class="features-grid">
+            <div class="donate">
                 <div class="feature-card">
-                    <div class="feature-icon">❤️</div>
-                    <h3>Support Development</h3>
+                    <h3><span class="feature-icon">❤️ </span> Support Development</h3>
                     <p>If you find Posteria useful in managing your media poster collection, please consider making a donation to support ongoing development and maintenance.</p>
-                    <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="float: right; margin-top: 20px; display: inline-block;" target="_blank">Make a Donation</a>
+                    <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="float: right; margin-top: 20px; display: inline-block; text-align: center;" target="_blank">Make a Donation</a>
                 </div>
-
             </div>
         </div>
     </section>
