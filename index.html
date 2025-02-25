@@ -277,8 +277,8 @@
         }
 
         .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            display: flex;
+            width: 70%;
             gap: 30px;
             margin-top: 40px;
             padding: 0 20px;
@@ -515,7 +515,7 @@
             }
             
             .features-grid {
-                grid-template-columns: 1fr;
+                width: 100%;
             }
             
             .screenshot {
@@ -571,6 +571,9 @@
             .feature-card {
                 padding: 20px;
             }
+            .features-grid {
+            	width: 100%;
+        	}
         }
         
 		@media (max-width: 768px) {
@@ -804,20 +807,15 @@
     </section>
 
     <section id="support" class="features" style="padding: 40px 0;">
-        <div class="container">
-            <div class="features-grid" style="grid-template-columns: repeat(2, 1fr); gap: 30px;">
+        <div class="container" style="display: flex; justify-content: center; align-items: center;">
+            <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">❤️</div>
                     <h3>Support Development</h3>
                     <p>If you find Posteria useful in managing your media poster collection, please consider making a donation to support ongoing development and maintenance.</p>
-                    <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="margin-top: 20px; display: inline-block;" target="_blank">Make a Donation</a>
+                    <a href="https://www.paypal.com/ncp/payment/FU85BL8345S7L" class="cta-button" style="float: right; margin-top: 20px; display: inline-block;" target="_blank">Make a Donation</a>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">☁️</div>
-                    <h3>Hosted Solution</h3>
-                    <p>Need a managed hosting solution? We offer hosted instances of Posteria for users who prefer a hands-off approach. Get in touch to learn more.</p>
-                    <a href="mailto:hosting@posteria.app?subject=Hosted%20Posteria%20Inquiry" class="cta-button" style="margin-top: 20px; display: inline-block;">Request Info</a>
-                </div>
+
             </div>
         </div>
     </section>
