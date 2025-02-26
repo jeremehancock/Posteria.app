@@ -704,8 +704,8 @@
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">⚡</div>
-                    <h3>Easy Upload</h3>
-                    <p>Import posters from local files or direct URLs</p>
+                    <h3>Easy Upload/Import</h3>
+                    <p>Upload posters from local files or direct URLs - Import posters directly from your Plex Server</p>
                 </div>
             </div>
         </div>
@@ -738,6 +738,8 @@
       - SESSION_DURATION=3600        # In seconds
       - IMAGES_PER_PAGE=24
       - MAX_FILE_SIZE=5242880        # In bytes
+      - PLEX_SERVER_URL=             # Optional for Importing from Plex
+      - PLEX_TOKEN=                  # Optional for Importing from Plex
     volumes:
       - ./posters/movies:/var/www/html/posters/movies
       - ./posters/tv-shows:/var/www/html/posters/tv-shows
@@ -805,6 +807,16 @@
                                 <td>MAX_FILE_SIZE</td>
                                 <td>Maximum upload file size in bytes</td>
                                 <td>5242880</td>
+                            </tr>
+                            <tr>
+                                <td>PLEX_SERVER_URL</td>
+                                <td>URL for your Plex Server</td>
+                                <td>ex: http://your-server:32400</td>
+                            </tr>
+                            <tr>
+                                <td>PLEX_TOKEN</td>
+                                <td>Plex Server Token</td>
+                                <td><a href="https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/" target="_blank">More info</a></td>
                             </tr>
                         </table>
                     </div>
