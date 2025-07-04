@@ -1139,6 +1139,10 @@
       - SESSION_DURATION=3600 # In seconds
       - AUTH_BYPASS=false # DO NOT USE if you expose Posteria outside your local network
 
+      - PUID=1000 # Specify the user id
+      - PGID=1000 # Specify the group id
+      - TZ=Etc/UTC # Specify a timezone to use
+
       - IMAGES_PER_PAGE=24
       - MAX_FILE_SIZE=5242880 # In bytes
 
@@ -1156,11 +1160,8 @@
       - AUTO_IMPORT_SEASONS=false # Import TV season posters
       - AUTO_IMPORT_COLLECTIONS=false # Import Collection posters
     volumes:
-      - ./posters/movies:/var/www/html/posters/movies
-      - ./posters/tv-shows:/var/www/html/posters/tv-shows
-      - ./posters/tv-seasons:/var/www/html/posters/tv-seasons
-      - ./posters/collections:/var/www/html/posters/collections
-      - ./data:/var/www/html/data # Logs are found here
+      - ./posters:/config/posters
+      - ./data:/config/data # Logs are found here
     restart: unless-stopped</code></pre>
                         <button class="copy-button">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -1226,9 +1227,22 @@
                                 <td>false</td>
                             </tr>
                             <tr>
-                                <td>IMAGES_PER_PAGE</td>
-                                <td>Number of posters per page</td>
-                                <td>24</td>
+                                <td>PUID</td>
+                                <td>User ID</td>
+                                <td>911 <a href="https://github.com/jeremehancock/Posteria#note" target="_blank">More
+                                        info</a></td>
+                            </tr>
+                            <tr>
+                                <td>PGID</td>
+                                <td>Group ID</td>
+                                <td>911 <a href="https://github.com/jeremehancock/Posteria#note" target="_blank">More
+                                        info</a></td>
+                            </tr>
+                            <tr>
+                                <td>TZ</td>
+                                <td>Timezone</td>
+                                <td>Etc/UTC <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List"
+                                        target="_blank">List</a></td>
                             </tr>
                             <tr>
                                 <td>MAX_FILE_SIZE</td>
