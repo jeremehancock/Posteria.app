@@ -1,5 +1,5 @@
 <?php
-// TMDB, TVDB, Fanart.tv & Mediux.pro Media Poster API - OPTIMIZED VERSION (NO AUTHENTICATION)
+// TMDB, TVDB, Fanart.tv & Mediux.pro Media Poster API - OPTIMIZED VERSION (FIXED)
 
 // Set content type to JSON
 header('Content-Type: application/json');
@@ -13,6 +13,7 @@ header('Access-Control-Allow-Headers: X-Client-Info');
 $tmdbApiKey = $_ENV['TMDB_API_KEY'] ?? getenv('TMDB_API_KEY');
 $fanartApiKey = $_ENV['FANART_API_KEY'] ?? getenv('FANART_API_KEY');
 $mediuxApiKey = $_ENV['MEDIUX_API_KEY'] ?? getenv('MEDIUX_API_KEY');
+$apiAccessKey = $_ENV['POSTERIA_API_KEY'] ?? getenv('POSTERIA_API_KEY');
 
 // API base URLs
 $tmdbBaseUrl = "https://api.themoviedb.org/3";
@@ -28,6 +29,13 @@ $tmdbPosterSizes = [
     'original' => 'original'
 ];
 $tmdbPosterBaseUrl = "https://image.tmdb.org/t/p/";
+
+// Trusted client configuration
+$trustedClientConfig = [
+    'appName' => 'Posteria',
+    'headerName' => 'X-Client-Info',
+    'timeWindow' => 5 * 60 * 1000,
+];
 
 // Global variables for efficiency
 $enableDebug = false;
@@ -141,7 +149,54 @@ function setCachedResponse($key, $data) {
     $responseCache[$key] = $data;
 }
 
-// AUTHENTICATION REMOVED - API now accessible without key or header
+// Function to validate the client info header
+function isValidClientInfo($headerValue) {
+    global $trustedClientConfig;
+    
+    if (empty($headerValue)) return false;
+    
+    try {
+        $decoded = base64_decode($headerValue);
+        if ($decoded === false) return false;
+        
+        $data = json_decode($decoded, true);
+        if ($data === null) return false;
+        
+        if (!isset($data['name']) || $data['name'] !== $trustedClientConfig['appName']) {
+            return false;
+        }
+        
+        if (!isset($data['ts']) || !is_numeric($data['ts'])) return false;
+        
+        $timestamp = (int) $data['ts'];
+        $now = round(microtime(true) * 1000);
+        $windowStart = $now - $trustedClientConfig['timeWindow'];
+        
+        return $timestamp >= $windowStart && $timestamp <= $now;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// Check authentication
+$isAuthenticated = false;
+
+$headers = getallheaders();
+$clientInfoHeader = isset($headers[$trustedClientConfig['headerName']]) ?
+    $headers[$trustedClientConfig['headerName']] :
+    (isset($_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $trustedClientConfig['headerName']))]) ?
+        $_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $trustedClientConfig['headerName']))] : null);
+
+if ($clientInfoHeader && isValidClientInfo($clientInfoHeader)) {
+    $isAuthenticated = true;
+}
+
+if (!$isAuthenticated) {
+    if (!isset($_GET['key']) || $_GET['key'] !== $apiAccessKey) {
+        sendError('Authentication required', 401);
+    }
+    $isAuthenticated = true;
+}
 
 // OPTIMIZATION: Batch TMDB requests
 function makeTmdbRequest($endpoint, $params = []) {
@@ -1126,6 +1181,7 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
         'include_tvdb' => 'Include TheTVDB posters (true/false, default: true)',
         'include_mediux' => 'Include Mediux.pro posters (true/false, default: true)',
         'debug' => 'Enable debug mode (true/false)',
+        'key' => 'API key for authentication (required if not using X-Client-Info header)',
         'help' => 'Show this help information (true/false)'
     ];
     
@@ -1135,8 +1191,6 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
         'thetvdb' => 'TheTVDB',
         'mediux.pro' => 'Mediux.pro'
     ];
-    
-    $response['note'] = 'Authentication has been removed - API is now publicly accessible';
 }
 
 // Add debug info if enabled
@@ -1145,8 +1199,7 @@ if ($enableDebug) {
     $response['optimizations'] = [
         'parallel_requests' => 'Enabled',
         'response_caching' => 'Enabled',
-        'connection_pooling' => 'Enabled',
-        'authentication' => 'Disabled'
+        'connection_pooling' => 'Enabled'
     ];
 }
 
