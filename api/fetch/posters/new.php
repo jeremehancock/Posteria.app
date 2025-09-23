@@ -162,8 +162,17 @@ function isValidClientInfo($headerValue) {
         $data = json_decode($decoded, true);
         if ($data === null) return false;
         
-        // Only validate app name, ignore timestamp
-        return isset($data['name']) && $data['name'] === $trustedClientConfig['appName'];
+        if (!isset($data['name']) || $data['name'] !== $trustedClientConfig['appName']) {
+            return false;
+        }
+        
+        if (!isset($data['ts']) || !is_numeric($data['ts'])) return false;
+        
+        $timestamp = (int) $data['ts'];
+        $now = round(microtime(true) * 1000);
+        $windowStart = $now - $trustedClientConfig['timeWindow'];
+        
+        return $timestamp >= $windowStart && $timestamp <= $now;
     } catch (Exception $e) {
         return false;
     }
