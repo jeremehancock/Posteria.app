@@ -34,7 +34,7 @@ $tmdbPosterBaseUrl = "https://image.tmdb.org/t/p/";
 $trustedClientConfig = [
     'appName' => 'Posteria',
     'headerName' => 'X-Client-Info',
-    'timeWindow' => 5 * 60 * 1000,
+    'timeWindow' => 30 * 60 * 1000,
 ];
 
 // Global variables for efficiency
