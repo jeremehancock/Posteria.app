@@ -42,71 +42,6 @@ $enableDebug = false;
 $debugLog = [];
 $responseCache = [];
 
-// TEMPORARY DEBUG ENDPOINT - Remove after testing
-if (isset($_GET['debug_header']) && $_GET['debug_header'] === 'true') {
-    header('Content-Type: application/json');
-    
-    function getDebugClientInfoHeader() {
-        global $trustedClientConfig;
-        
-        $headerName = $trustedClientConfig['headerName'];
-        
-        // Method 1: Try getallheaders() if available
-        if (function_exists('getallheaders')) {
-            $headers = getallheaders();
-            foreach ($headers as $key => $value) {
-                if (strtolower($key) === strtolower($headerName)) {
-                    return $value;
-                }
-            }
-        }
-        
-        // Method 2: Try $_SERVER variables
-        $serverKeys = [
-            'HTTP_X_CLIENT_INFO',
-            'HTTP_X-CLIENT-INFO',
-            strtoupper(str_replace('-', '_', 'HTTP_' . $headerName))
-        ];
-        
-        foreach ($serverKeys as $serverKey) {
-            if (isset($_SERVER[$serverKey]) && !empty($_SERVER[$serverKey])) {
-                return $_SERVER[$serverKey];
-            }
-        }
-        
-        return null;
-    }
-    
-    $receivedHeader = getDebugClientInfoHeader();
-    $debugResponse = [
-        'received_header' => $receivedHeader,
-        'current_time' => round(microtime(true) * 1000),
-        'current_time_readable' => date('Y-m-d H:i:s T'),
-        'all_headers' => function_exists('getallheaders') ? getallheaders() : 'not available',
-        'server_vars' => array_filter($_SERVER, function($key) {
-            return strpos($key, 'HTTP_') === 0;
-        }, ARRAY_FILTER_USE_KEY)
-    ];
-    
-    if ($receivedHeader) {
-        try {
-            $decoded = base64_decode($receivedHeader);
-            $parsed = json_decode($decoded, true);
-            $debugResponse['decoded_header'] = $decoded;
-            $debugResponse['parsed_header'] = $parsed;
-            
-            if (isset($parsed['ts'])) {
-                $debugResponse['timestamp_diff_seconds'] = (round(microtime(true) * 1000) - $parsed['ts']) / 1000;
-            }
-        } catch (Exception $e) {
-            $debugResponse['decode_error'] = $e->getMessage();
-        }
-    }
-    
-    echo json_encode($debugResponse, JSON_PRETTY_PRINT);
-    exit;
-}
-
 // OPTIMIZATION: Centralized HTTP Client with connection pooling
 class HttpClient {
     private static $instance = null;
@@ -214,160 +149,53 @@ function setCachedResponse($key, $data) {
     $responseCache[$key] = $data;
 }
 
-// IMPROVED: Function to get client info header with better detection
-function getClientInfoHeader() {
-    global $trustedClientConfig;
-    
-    $headerName = $trustedClientConfig['headerName']; // 'X-Client-Info'
-    
-    // Method 1: Try getallheaders() if available
-    if (function_exists('getallheaders')) {
-        $headers = getallheaders();
-        
-        // Case-insensitive header search
-        foreach ($headers as $key => $value) {
-            if (strtolower($key) === strtolower($headerName)) {
-                debugLog("Found header via getallheaders (case-insensitive)", ['key' => $key, 'value' => $value]);
-                return $value;
-            }
-        }
-    }
-    
-    // Method 2: Try $_SERVER variables
-    $serverKeys = [
-        'HTTP_X_CLIENT_INFO',
-        'HTTP_X-CLIENT-INFO',
-        strtoupper(str_replace('-', '_', 'HTTP_' . $headerName))
-    ];
-    
-    foreach ($serverKeys as $serverKey) {
-        if (isset($_SERVER[$serverKey]) && !empty($_SERVER[$serverKey])) {
-            debugLog("Found header via \$_SERVER", ['key' => $serverKey, 'value' => $_SERVER[$serverKey]]);
-            return $_SERVER[$serverKey];
-        }
-    }
-    
-    debugLog("Client info header not found", [
-        'expected_header' => $headerName,
-        'available_headers' => function_exists('getallheaders') ? getallheaders() : 'getallheaders() not available',
-        'server_vars' => array_filter($_SERVER, function($key) {
-            return strpos($key, 'HTTP_') === 0;
-        }, ARRAY_FILTER_USE_KEY)
-    ]);
-    
-    return null;
-}
-
-// IMPROVED: Function to validate the client info header
+// Function to validate the client info header
 function isValidClientInfo($headerValue) {
     global $trustedClientConfig;
     
-    if (empty($headerValue)) {
-        debugLog('Client info header is empty');
-        return false;
-    }
+    if (empty($headerValue)) return false;
     
     try {
-        // Decode base64
-        $decoded = base64_decode($headerValue, true);
-        if ($decoded === false) {
-            debugLog('Failed to decode base64 header', ['header' => $headerValue]);
-            return false;
-        }
+        $decoded = base64_decode($headerValue);
+        if ($decoded === false) return false;
         
-        debugLog('Successfully decoded header', ['decoded' => $decoded]);
-        
-        // Parse JSON
         $data = json_decode($decoded, true);
-        if ($data === null) {
-            debugLog('Failed to parse JSON from decoded header', [
-                'json_error' => json_last_error_msg(),
-                'decoded_content' => $decoded
-            ]);
-            return false;
-        }
+        if ($data === null) return false;
         
-        debugLog('Successfully parsed header JSON', $data);
-        
-        // Check app name
         if (!isset($data['name']) || $data['name'] !== $trustedClientConfig['appName']) {
-            debugLog('App name validation failed', [
-                'expected' => $trustedClientConfig['appName'],
-                'received' => $data['name'] ?? 'not set'
-            ]);
             return false;
         }
         
-        // Check timestamp
-        if (!isset($data['ts']) || !is_numeric($data['ts'])) {
-            debugLog('Timestamp validation failed', [
-                'timestamp' => $data['ts'] ?? 'not set',
-                'is_numeric' => isset($data['ts']) ? is_numeric($data['ts']) : false
-            ]);
-            return false;
-        }
+        if (!isset($data['ts']) || !is_numeric($data['ts'])) return false;
         
         $timestamp = (int) $data['ts'];
         $now = round(microtime(true) * 1000);
         $windowStart = $now - $trustedClientConfig['timeWindow'];
-        $timeDiff = abs($now - $timestamp);
         
-        debugLog('Timestamp validation details', [
-            'client_timestamp' => $timestamp,
-            'client_readable' => date('Y-m-d H:i:s', $timestamp / 1000),
-            'server_timestamp' => $now,
-            'server_readable' => date('Y-m-d H:i:s', $now / 1000),
-            'window_start' => $windowStart,
-            'window_size_minutes' => $trustedClientConfig['timeWindow'] / (1000 * 60),
-            'time_diff_ms' => $timeDiff,
-            'time_diff_seconds' => $timeDiff / 1000,
-            'is_within_window' => $timestamp >= $windowStart && $timestamp <= $now
-        ]);
-        
-        // Check if timestamp is within the allowed window
-        if ($timestamp < $windowStart || $timestamp > $now) {
-            debugLog('Timestamp outside allowed window', [
-                'timestamp_too_old' => $timestamp < $windowStart,
-                'timestamp_in_future' => $timestamp > $now,
-                'max_age_minutes' => ($now - $timestamp) / (1000 * 60)
-            ]);
-            return false;
-        }
-        
-        debugLog('Client info validation successful');
-        return true;
-        
+        return $timestamp >= $windowStart && $timestamp <= $now;
     } catch (Exception $e) {
-        debugLog('Exception in client info validation', [
-            'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
         return false;
     }
 }
 
-// IMPROVED: Authentication check
+// Check authentication
 $isAuthenticated = false;
 
-// Try X-Client-Info header first
-$clientInfoHeader = getClientInfoHeader();
+$headers = getallheaders();
+$clientInfoHeader = isset($headers[$trustedClientConfig['headerName']]) ?
+    $headers[$trustedClientConfig['headerName']] :
+    (isset($_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $trustedClientConfig['headerName']))]) ?
+        $_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $trustedClientConfig['headerName']))] : null);
 
 if ($clientInfoHeader && isValidClientInfo($clientInfoHeader)) {
     $isAuthenticated = true;
-    debugLog('Authentication successful via X-Client-Info header');
-} else {
-    debugLog('X-Client-Info authentication failed, trying API key');
-    
-    // Fallback to API key
-    if (isset($_GET['key']) && $_GET['key'] === $apiAccessKey) {
-        $isAuthenticated = true;
-        debugLog('Authentication successful via API key');
-    }
 }
 
 if (!$isAuthenticated) {
-    debugLog('All authentication methods failed');
-    sendError('Authentication required. Invalid or missing credentials.', 401);
+    if (!isset($_GET['key']) || $_GET['key'] !== $apiAccessKey) {
+        sendError('Authentication required', 401);
+    }
+    $isAuthenticated = true;
 }
 
 // OPTIMIZATION: Batch TMDB requests
@@ -1372,11 +1200,6 @@ if ($enableDebug) {
         'parallel_requests' => 'Enabled',
         'response_caching' => 'Enabled',
         'connection_pooling' => 'Enabled'
-    ];
-    $response['authentication'] = [
-        'method' => $clientInfoHeader ? 'X-Client-Info header' : 'API key',
-        'header_received' => !empty($clientInfoHeader),
-        'header_valid' => !empty($clientInfoHeader) && isValidClientInfo($clientInfoHeader)
     ];
 }
 
