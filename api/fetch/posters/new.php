@@ -1,6 +1,5 @@
 <?php
-// TMDB, TVDB, Fanart.tv & Mediux.pro Media Poster API - OPTIMIZED VERSION (ENHANCED FOR MORE RESULTS)
-// This version fetches multiple pages of search results to return significantly more posters
+// TMDB, TVDB, Fanart.tv & Mediux.pro Media Poster API - OPTIMIZED VERSION (FIXED)
 
 // Set content type to JSON
 header('Content-Type: application/json');
@@ -239,112 +238,44 @@ function makeTmdbRequest($endpoint, $params = [])
     return ['success' => false, 'error' => 'API request failed'];
 }
 
-// Search functions using optimized requests - ENHANCED to fetch multiple pages
-function searchMovies($query, $maxPages = 3)
+// Search functions using optimized requests
+function searchMovies($query)
 {
-    $allResults = ['results' => []];
-
-    for ($page = 1; $page <= $maxPages; $page++) {
-        $pageResults = makeTmdbRequest("/search/movie", [
-            'query' => $query,
-            'include_adult' => 'false',
-            'language' => 'en-US',
-            'page' => $page
-        ]);
-
-        if (isset($pageResults['results']) && !empty($pageResults['results'])) {
-            $allResults['results'] = array_merge($allResults['results'], $pageResults['results']);
-
-            // Stop if we've reached the last page
-            if ($page >= $pageResults['total_pages']) {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return $allResults;
+    return makeTmdbRequest("/search/movie", [
+        'query' => $query,
+        'include_adult' => 'false',
+        'language' => 'en-US',
+        'page' => 1
+    ]);
 }
 
-function searchTVShows($query, $maxPages = 3)
+function searchTVShows($query)
 {
-    $allResults = ['results' => []];
-
-    for ($page = 1; $page <= $maxPages; $page++) {
-        $pageResults = makeTmdbRequest("/search/tv", [
-            'query' => $query,
-            'include_adult' => 'false',
-            'language' => 'en-US',
-            'page' => $page
-        ]);
-
-        if (isset($pageResults['results']) && !empty($pageResults['results'])) {
-            $allResults['results'] = array_merge($allResults['results'], $pageResults['results']);
-
-            // Stop if we've reached the last page
-            if ($page >= $pageResults['total_pages']) {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return $allResults;
+    return makeTmdbRequest("/search/tv", [
+        'query' => $query,
+        'include_adult' => 'false',
+        'language' => 'en-US',
+        'page' => 1
+    ]);
 }
 
-function searchMulti($query, $maxPages = 3)
+function searchMulti($query)
 {
-    $allResults = ['results' => []];
-
-    for ($page = 1; $page <= $maxPages; $page++) {
-        $pageResults = makeTmdbRequest("/search/multi", [
-            'query' => $query,
-            'include_adult' => 'false',
-            'language' => 'en-US',
-            'page' => $page
-        ]);
-
-        if (isset($pageResults['results']) && !empty($pageResults['results'])) {
-            $allResults['results'] = array_merge($allResults['results'], $pageResults['results']);
-
-            // Stop if we've reached the last page
-            if ($page >= $pageResults['total_pages']) {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return $allResults;
+    return makeTmdbRequest("/search/multi", [
+        'query' => $query,
+        'include_adult' => 'false',
+        'language' => 'en-US',
+        'page' => 1
+    ]);
 }
 
-function searchCollections($query, $maxPages = 2)
+function searchCollections($query)
 {
-    $allResults = ['results' => []];
-
-    for ($page = 1; $page <= $maxPages; $page++) {
-        $pageResults = makeTmdbRequest("/search/collection", [
-            'query' => $query,
-            'language' => 'en-US',
-            'page' => $page
-        ]);
-
-        if (isset($pageResults['results']) && !empty($pageResults['results'])) {
-            $allResults['results'] = array_merge($allResults['results'], $pageResults['results']);
-
-            // Stop if we've reached the last page
-            if ($page >= $pageResults['total_pages']) {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    return $allResults;
+    return makeTmdbRequest("/search/collection", [
+        'query' => $query,
+        'language' => 'en-US',
+        'page' => 1
+    ]);
 }
 
 // Get detailed info functions
@@ -705,7 +636,6 @@ $specificSeason = isset($_GET['season']) ? intval($_GET['season']) : null;
 $includeAllPosters = isset($_GET['include_all_posters']) && ($_GET['include_all_posters'] === 'true' || $_GET['include_all_posters'] === '1');
 $includeTvdb = isset($_GET['include_tvdb']) ? ($_GET['include_tvdb'] === 'true' || $_GET['include_tvdb'] === '1') : true;
 $includeMediux = isset($_GET['include_mediux']) ? ($_GET['include_mediux'] === 'true' || $_GET['include_mediux'] === '1') : true;
-$maxPages = isset($_GET['max_pages']) ? max(1, min(5, intval($_GET['max_pages']))) : 3; // Default to 3 pages, max 5
 
 $enableDebug = isset($_GET['debug']) && ($_GET['debug'] === 'true' || $_GET['debug'] === '1');
 
@@ -746,16 +676,16 @@ if ($specificSeason !== null) {
 // Search based on media type
 $searchResults = [];
 if ($mediaType === 'movie') {
-    $searchResults = searchMovies($searchTerm, $maxPages);
+    $searchResults = searchMovies($searchTerm);
 } elseif ($mediaType === 'tv') {
-    $searchResults = searchTVShows($searchTerm, $maxPages);
+    $searchResults = searchTVShows($searchTerm);
 } elseif ($mediaType === 'collection') {
-    $searchResults = searchCollections($searchTerm, min(2, $maxPages)); // Collections get fewer pages
+    $searchResults = searchCollections($searchTerm);
 } else { // 'all'
-    $searchResults = searchMulti($searchTerm, $maxPages);
+    $searchResults = searchMulti($searchTerm);
 
     // Add collection results
-    $collectionResults = searchCollections($searchTerm, min(2, $maxPages));
+    $collectionResults = searchCollections($searchTerm);
     if (isset($collectionResults['results']) && !empty($collectionResults['results'])) {
         foreach ($collectionResults['results'] as &$result) {
             $result['media_type'] = 'collection';
@@ -1309,7 +1239,6 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
         'include_all_posters' => 'Include all available posters (true/false)',
         'include_tvdb' => 'Include TheTVDB posters (true/false, default: true)',
         'include_mediux' => 'Include Mediux.pro posters (true/false, default: true)',
-        'max_pages' => 'Number of search result pages to fetch from TMDB (1-5, default: 3) - Higher values return more posters',
         'debug' => 'Enable debug mode (true/false)',
         'key' => 'API key for authentication (required if not using X-Client-Info header)',
         'help' => 'Show this help information (true/false)'
@@ -1320,13 +1249,6 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
         'fanart.tv' => 'Fanart.tv',
         'thetvdb' => 'TheTVDB',
         'mediux.pro' => 'Mediux.pro'
-    ];
-
-    $response['enhancements'] = [
-        'multi_page_fetching' => 'This version fetches multiple pages of search results, returning significantly more posters than the standard version',
-        'default_pages' => 3,
-        'max_pages' => 5,
-        'note' => 'Use max_pages=5 for maximum poster results'
     ];
 }
 
