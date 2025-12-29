@@ -1159,6 +1159,7 @@
       - AUTO_IMPORT_SHOWS=false # Import TV Show posters
       - AUTO_IMPORT_SEASONS=false # Import TV season posters
       - AUTO_IMPORT_COLLECTIONS=false # Import Collection posters
+      - EXCLUDED_LIBRARIES=DVR # Comma-separated list of library names to exclude (e.g., Kids Movies,Anime)
     volumes:
       - ./posters:/config/posters
       - ./data:/config/data # Logs are found here
@@ -1229,13 +1230,15 @@
                             <tr>
                                 <td>PUID</td>
                                 <td>User ID</td>
-                                <td>911 <a href="https://github.com/jeremehancock/Posteria#note" target="_blank">More
+                                <td>Not Set <a href="https://github.com/jeremehancock/Posteria#note"
+                                        target="_blank">More
                                         info</a></td>
                             </tr>
                             <tr>
                                 <td>PGID</td>
                                 <td>Group ID</td>
-                                <td>911 <a href="https://github.com/jeremehancock/Posteria#note" target="_blank">More
+                                <td>Not Set <a href="https://github.com/jeremehancock/Posteria#note"
+                                        target="_blank">More
                                         info</a></td>
                             </tr>
                             <tr>
@@ -1305,6 +1308,11 @@
                                 <td>AUTO_IMPORT_COLLECTIONS</td>
                                 <td>Import Collection posters</td>
                                 <td>true</td>
+                            </tr>
+                            <tr>
+                                <td>EXCLUDED_LIBRARIES</td>
+                                <td>Libraries to exclude</td>
+                                <td>Not Set</td>
                             </tr>
                         </table>
                     </div>
@@ -1446,7 +1454,8 @@
                                     fetching</li>
                                 <li class="poster-source"><strong><a href="https://mediux.pro/"
                                             target="_blank">Mediux</a></strong> - Collection of professionally designed
-                                    media artwork</li>
+                                    media artwork, now fully integrated with Posteria for automatic poster
+                                    fetching</li>
                             </ul>
                             <p>Posteria supports using Mediux YAML files in the URL uploader when changing posters,
                                 making it a convenient choice for managing your collection.</p>
@@ -1514,6 +1523,9 @@
                     </a>
                     <a href="https://fanart.tv/" target="_blank" class="attribution-logo" title="Fanart.tv">
                         <img src="images/fanart.png" alt="Fanart.tv Logo" height="30">
+                    </a>
+                    <a href="https://mediux.pro/" target="_blank" class="attribution-logo" title="Mediux.pro">
+                        <img src="images/mediux.svg" alt="Mediux.pro Logo" height="30">
                     </a>
                 </div>
             </div>
