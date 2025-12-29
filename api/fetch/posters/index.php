@@ -1,5 +1,5 @@
 <?php
-// TMDB, TVDB, Fanart.tv & Mediux.pro Media Poster API - OPTIMIZED VERSION (FIXED)
+// TMDB, TVDB & Fanart.tv Media Poster API - OPTIMIZED VERSION
 
 // Set content type to JSON
 header('Content-Type: application/json');
@@ -12,14 +12,11 @@ header('Access-Control-Allow-Headers: X-Client-Info');
 // Configuration from environment variables
 $tmdbApiKey = $_ENV['TMDB_API_KEY'] ?? getenv('TMDB_API_KEY');
 $fanartApiKey = $_ENV['FANART_API_KEY'] ?? getenv('FANART_API_KEY');
-$mediuxApiKey = $_ENV['MEDIUX_API_KEY'] ?? getenv('MEDIUX_API_KEY');
 $apiAccessKey = $_ENV['POSTERIA_API_KEY'] ?? getenv('POSTERIA_API_KEY');
 
 // API base URLs
 $tmdbBaseUrl = "https://api.themoviedb.org/3";
 $fanartBaseUrl = "https://webservice.fanart.tv/v3";
-$mediuxBaseUrl = "https://staged.mediux.io";
-$mediuxAssetBaseUrl = "https://api.mediux.pro/assets";
 
 // TMDB poster configuration
 $tmdbPosterSizes = [
@@ -338,7 +335,7 @@ function fetchExternalData($requests)
     return $httpClient->makeParallelRequests($requests);
 }
 
-// Format poster URLs (unchanged from original)
+// Format poster URLs
 function formatTmdbPosterUrls($posterPath)
 {
     global $tmdbPosterBaseUrl, $tmdbPosterSizes;
@@ -363,28 +360,6 @@ function formatFanartPosterUrls($url)
     ];
 }
 
-function formatMediuxPosterUrls($posterData)
-{
-    global $mediuxAssetBaseUrl;
-
-    if (empty($posterData) || !isset($posterData['id']))
-        return null;
-
-    $modified = isset($posterData['modified_on']) ? $posterData['modified_on'] : time();
-    if (is_numeric($modified)) {
-        $modified = date('Y-m-d\TH:i:s.000\Z', $modified);
-    }
-
-    $baseUrl = "{$mediuxAssetBaseUrl}/{$posterData['id']}.png?{$modified}";
-
-    return [
-        'small' => $baseUrl,
-        'medium' => $baseUrl,
-        'large' => $baseUrl,
-        'original' => $baseUrl
-    ];
-}
-
 function formatTvdbPosterUrls($url)
 {
     return [
@@ -396,74 +371,27 @@ function formatTvdbPosterUrls($url)
 }
 
 // OPTIMIZATION: Improved external data fetching functions
-function getExternalMovieData($tmdbId, $includeMediux)
+function getExternalMovieData($tmdbId)
 {
-    global $fanartApiKey, $mediuxApiKey, $fanartBaseUrl, $mediuxBaseUrl;
+    global $fanartApiKey, $fanartBaseUrl;
 
     $requests = [];
     $requests['fanart'] = [
         'url' => "{$fanartBaseUrl}/movies/{$tmdbId}?api_key={$fanartApiKey}"
     ];
 
-    if ($includeMediux) {
-        $requests['mediux'] = [
-            'url' => "{$mediuxBaseUrl}/items/movies/{$tmdbId}?fields=files.*&deep[files][_filter][file_type][_eq]=poster",
-            'headers' => [
-                'Authorization: Bearer ' . $mediuxApiKey,
-                'Accept: application/json'
-            ]
-        ];
-    }
-
     return fetchExternalData($requests);
 }
 
-function getExternalTVData($tmdbId, $tvdbId, $includeMediux)
+function getExternalTVData($tmdbId, $tvdbId)
 {
-    global $fanartApiKey, $mediuxApiKey, $fanartBaseUrl, $mediuxBaseUrl;
+    global $fanartApiKey, $fanartBaseUrl;
 
     $requests = [];
 
     if ($tvdbId) {
         $requests['fanart'] = [
             'url' => "{$fanartBaseUrl}/tv/{$tvdbId}?api_key={$fanartApiKey}"
-        ];
-    }
-
-    if ($includeMediux) {
-        $requests['mediux'] = [
-            'url' => "{$mediuxBaseUrl}/items/shows/{$tmdbId}?fields=files.*&deep[files][_filter][file_type][_eq]=poster",
-            'headers' => [
-                'Authorization: Bearer ' . $mediuxApiKey,
-                'Accept: application/json'
-            ]
-        ];
-
-        $requests['mediux_seasons'] = [
-            'url' => "{$mediuxBaseUrl}/items/shows/{$tmdbId}?fields=seasons.id,seasons.season_number,seasons.files.*&deep[seasons][files][_filter][file_type][_eq]=poster",
-            'headers' => [
-                'Authorization: Bearer ' . $mediuxApiKey,
-                'Accept: application/json'
-            ]
-        ];
-    }
-
-    return fetchExternalData($requests);
-}
-
-function getExternalCollectionData($collectionId, $includeMediux)
-{
-    global $mediuxApiKey, $mediuxBaseUrl;
-
-    $requests = [];
-
-    if ($includeMediux) {
-        $requests['mediux'] = [
-            'url' => "{$mediuxBaseUrl}/items/collections/{$collectionId}?fields=files.*&deep[files][_filter][file_type][_eq]=poster",
-            'headers' => [
-                'Authorization: Bearer ' . $mediuxApiKey,
-                'Accept: application/json'
-            ]
         ];
     }
 
@@ -512,7 +440,7 @@ function getTvdbPosters($title, $contentType, $seasonNumber = null)
     return ['posters' => $posters, 'attempted_urls' => array_keys($requests)];
 }
 
-// Extract poster URLs from HTML (unchanged from original)
+// Extract poster URLs from HTML
 function extractPosterUrls($html, $contentType, $seasonNumber = null)
 {
     $posters = [];
@@ -589,7 +517,7 @@ function extractPosterUrls($html, $contentType, $seasonNumber = null)
     return $posters;
 }
 
-// Helper functions (unchanged from original)
+// Helper functions
 function extractSeasonNumber($query)
 {
     if (preg_match('/(season|s)\s*(\d+)/i', $query, $matches)) {
@@ -635,7 +563,6 @@ $showSeasons = isset($_GET['show_seasons']) && ($_GET['show_seasons'] === 'true'
 $specificSeason = isset($_GET['season']) ? intval($_GET['season']) : null;
 $includeAllPosters = isset($_GET['include_all_posters']) && ($_GET['include_all_posters'] === 'true' || $_GET['include_all_posters'] === '1');
 $includeTvdb = isset($_GET['include_tvdb']) ? ($_GET['include_tvdb'] === 'true' || $_GET['include_tvdb'] === '1') : true;
-$includeMediux = isset($_GET['include_mediux']) ? ($_GET['include_mediux'] === 'true' || $_GET['include_mediux'] === '1') : true;
 
 $enableDebug = isset($_GET['debug']) && ($_GET['debug'] === 'true' || $_GET['debug'] === '1');
 
@@ -713,7 +640,7 @@ if (empty($searchResults['results'])) {
 // OPTIMIZATION: Group results by type for batch processing
 $movieResults = [];
 $tvResults = [];
-$collectionResults = [];
+$collectionResultsList = [];
 
 foreach ($searchResults['results'] as $result) {
     $type = $mediaType === 'all' ? (isset($result['media_type']) ? $result['media_type'] : $mediaType) : $mediaType;
@@ -728,12 +655,12 @@ foreach ($searchResults['results'] as $result) {
             $tvResults[] = $result;
             break;
         case 'collection':
-            $collectionResults[] = $result;
+            $collectionResultsList[] = $result;
             break;
     }
 }
 
-// Process movie results - maintaining original logic but with parallel external calls
+// Process movie results
 foreach ($movieResults as $result) {
     $tmdbId = $result['id'];
 
@@ -756,23 +683,8 @@ foreach ($movieResults as $result) {
         $baseItem['imdb_id'] = $movieDetails['external_ids']['imdb_id'];
     }
 
-    // OPTIMIZATION: Get external data in parallel
-    $externalData = getExternalMovieData($tmdbId, $includeMediux);
-
-    // Process Mediux.pro posters first
-    if ($includeMediux && isset($externalData['mediux']) && $externalData['mediux']['success']) {
-        $mediuxData = json_decode($externalData['mediux']['content'], true);
-        if (isset($mediuxData['data']['files']) && is_array($mediuxData['data']['files'])) {
-            foreach ($mediuxData['data']['files'] as $file) {
-                if (is_array($file) && isset($file['id'])) {
-                    $item = $baseItem;
-                    $item['poster'] = formatMediuxPosterUrls($file);
-                    $item['source'] = 'mediux.pro';
-                    $response['results'][] = $item;
-                }
-            }
-        }
-    }
+    // Get external data in parallel
+    $externalData = getExternalMovieData($tmdbId);
 
     // Process fanart.tv posters
     if (isset($externalData['fanart']) && $externalData['fanart']['success']) {
@@ -820,7 +732,7 @@ foreach ($movieResults as $result) {
     }
 }
 
-// Process TV results - maintaining original logic but with parallel external calls
+// Process TV results
 foreach ($tvResults as $result) {
     $tmdbId = $result['id'];
 
@@ -844,75 +756,10 @@ foreach ($tvResults as $result) {
         $baseItem['tvdb_id'] = $tvdbId;
     }
 
-    // OPTIMIZATION: Get external data in parallel
-    $externalData = getExternalTVData($tmdbId, $tvdbId, $includeMediux);
+    // Get external data in parallel
+    $externalData = getExternalTVData($tmdbId, $tvdbId);
 
     $seenSeasonPosters = [];
-
-    // Process Mediux.pro TV posters
-    if ($includeMediux && isset($externalData['mediux']) && $externalData['mediux']['success']) {
-        $mediuxData = json_decode($externalData['mediux']['content'], true);
-        if (isset($mediuxData['data']['files']) && is_array($mediuxData['data']['files'])) {
-            foreach ($mediuxData['data']['files'] as $file) {
-                if (is_array($file) && isset($file['id'])) {
-                    $item = $baseItem;
-                    $item['poster'] = formatMediuxPosterUrls($file);
-                    $item['source'] = 'mediux.pro';
-
-                    if ($specificSeason !== null) {
-                        $item = addSeasonInfoToItem($item, $tvDetails, $specificSeason);
-                    }
-
-                    $response['results'][] = $item;
-                }
-            }
-        }
-    }
-
-    // Process Mediux.pro season posters if specific season requested
-    if ($includeMediux && $specificSeason !== null && isset($externalData['mediux_seasons']) && $externalData['mediux_seasons']['success']) {
-        $mediuxSeasonData = json_decode($externalData['mediux_seasons']['content'], true);
-        if (isset($mediuxSeasonData['data']['seasons'])) {
-            foreach ($mediuxSeasonData['data']['seasons'] as $season) {
-                if ($specificSeason !== null && $season['season_number'] != $specificSeason) {
-                    continue;
-                }
-
-                if (isset($season['files']) && is_array($season['files'])) {
-                    foreach ($season['files'] as $file) {
-                        if (is_array($file) && isset($file['id'])) {
-                            $item = $baseItem;
-
-                            $seasonData = [
-                                'season_number' => $season['season_number'],
-                                'name' => "Season " . $season['season_number'],
-                                'id' => $season['id']
-                            ];
-
-                            // Find more season info from TMDB
-                            if (isset($tvDetails['seasons'])) {
-                                foreach ($tvDetails['seasons'] as $tmdbSeason) {
-                                    if ($tmdbSeason['season_number'] == $season['season_number']) {
-                                        $seasonData['name'] = $tmdbSeason['name'];
-                                        $seasonData['episode_count'] = $tmdbSeason['episode_count'];
-                                        $seasonData['air_date'] = isset($tmdbSeason['air_date']) ? $tmdbSeason['air_date'] : null;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            $seasonData['poster'] = formatMediuxPosterUrls($file);
-                            $seasonData['poster_source'] = 'mediux.pro';
-
-                            $item['season'] = $seasonData;
-                            $item['source'] = 'mediux.pro';
-                            $response['results'][] = $item;
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // Process fanart.tv TV posters
     if (isset($externalData['fanart']) && $externalData['fanart']['success']) {
@@ -1079,8 +926,8 @@ foreach ($tvResults as $result) {
     }
 }
 
-// Process collection results - maintaining original logic but with parallel external calls
-foreach ($collectionResults as $result) {
+// Process collection results
+foreach ($collectionResultsList as $result) {
     if (empty($result['poster_path']))
         continue;
 
@@ -1096,24 +943,6 @@ foreach ($collectionResults as $result) {
     // Get collection details and images
     $collectionDetails = getCollectionDetails($collectionId);
     $collectionImages = getCollectionImages($collectionId);
-
-    // OPTIMIZATION: Get external data in parallel
-    $externalData = getExternalCollectionData($collectionId, $includeMediux);
-
-    // Process Mediux.pro collection posters
-    if ($includeMediux && isset($externalData['mediux']) && $externalData['mediux']['success']) {
-        $mediuxData = json_decode($externalData['mediux']['content'], true);
-        if (isset($mediuxData['data']['files']) && is_array($mediuxData['data']['files'])) {
-            foreach ($mediuxData['data']['files'] as $file) {
-                if (is_array($file) && isset($file['id'])) {
-                    $item = $baseItem;
-                    $item['poster'] = formatMediuxPosterUrls($file);
-                    $item['source'] = 'mediux.pro';
-                    $response['results'][] = $item;
-                }
-            }
-        }
-    }
 
     // Add TMDB main poster
     if (!empty($result['poster_path'])) {
@@ -1144,7 +973,7 @@ foreach ($collectionResults as $result) {
 
     $collectionMovieId = findMovieByName($searchName);
     if ($collectionMovieId) {
-        $collectionExternalData = getExternalMovieData($collectionMovieId, false);
+        $collectionExternalData = getExternalMovieData($collectionMovieId);
         if (isset($collectionExternalData['fanart']) && $collectionExternalData['fanart']['success']) {
             $fanartData = json_decode($collectionExternalData['fanart']['content'], true);
             if (!empty($fanartData) && isset($fanartData['movieposter'])) {
@@ -1161,7 +990,7 @@ foreach ($collectionResults as $result) {
     // If no collection-specific posters, use first movie posters
     if ($collectionMovieId === null && isset($collectionDetails['parts']) && !empty($collectionDetails['parts'])) {
         $firstMovie = $collectionDetails['parts'][0];
-        $firstMovieExternalData = getExternalMovieData($firstMovie['id'], false);
+        $firstMovieExternalData = getExternalMovieData($firstMovie['id']);
         if (isset($firstMovieExternalData['fanart']) && $firstMovieExternalData['fanart']['success']) {
             $fanartData = json_decode($firstMovieExternalData['fanart']['content'], true);
             if (!empty($fanartData) && isset($fanartData['movieposter'])) {
@@ -1238,7 +1067,6 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
         'show_seasons' => 'Include season details for TV shows (true/false)',
         'include_all_posters' => 'Include all available posters (true/false)',
         'include_tvdb' => 'Include TheTVDB posters (true/false, default: true)',
-        'include_mediux' => 'Include Mediux.pro posters (true/false, default: true)',
         'debug' => 'Enable debug mode (true/false)',
         'key' => 'API key for authentication (required if not using X-Client-Info header)',
         'help' => 'Show this help information (true/false)'
@@ -1247,8 +1075,7 @@ if (isset($_GET['help']) && $_GET['help'] === 'true') {
     $response['sources'] = [
         'tmdb' => 'The Movie Database (TMDB)',
         'fanart.tv' => 'Fanart.tv',
-        'thetvdb' => 'TheTVDB',
-        'mediux.pro' => 'Mediux.pro'
+        'thetvdb' => 'TheTVDB'
     ];
 }
 
