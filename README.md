@@ -7,3 +7,7 @@ Visit [posteria.app](https://posteria.app) to see the landing page in action.
 ## License
 
 [MIT License](LICENSE)
+
+## AI Assistance Disclosure
+
+This project was created with the help of AI.
