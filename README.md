@@ -11,6 +11,9 @@
 > Posteria remains open source and the existing Docker image still works, but it is unmaintained — no new features,
 > fixes, or support. Migrating to Marquee is strongly recommended.
 > The Posteria repo is still available at [jeremehancock/Posteria](https://github.com/jeremehancock/Posteria).
+>
+> **The poster search API stays here.** It continues to live on this project and on the `posteria.app` domain at
+> `https://posteria.app/api/fetch/posters` — it is not moving to Marquee, and existing integrations keep working.
 
 This repository contains the landing page for Posteria, a media poster management system. The page is built with HTML, CSS, and vanilla JavaScript.
 
