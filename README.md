@@ -3,10 +3,10 @@
 > [!IMPORTANT]
 > ### Posteria is no longer actively developed
 >
-> Posteria has been replaced by **[Marquee](https://marquee.dumbprojects.com/)** — a complete re-write that is faster,
+> Posteria has been replaced by **[Marquee](https://getmarquee.now)** — a complete re-write that is faster,
 > easier to run, and actively maintained. All new features and fixes happen there.
 >
-> **[Visit Marquee](https://marquee.dumbprojects.com/)** · **[Marquee on GitHub](https://github.com/jeremehancock/Marquee)**
+> **[Visit Marquee](https://getmarquee.now)** · **[Marquee on GitHub](https://github.com/jeremehancock/Marquee)**
 >
 > Posteria remains open source and the existing Docker image still works, but it is unmaintained — no new features,
 > fixes, or support. Migrating to Marquee is strongly recommended.
