@@ -1,0 +1,7 @@
+# Local Claude Code configuration — not part of the deployed site.
+.claude/
+
+# Internal planning documents. Anything committed here is served publicly at
+# posteria.app/<path>, because nixpacks runs `php -S -t .` from the repo root.
+marquee-api-build-brief.md
+marquee-api-handoff-notes.md

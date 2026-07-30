@@ -1,0 +1,15 @@
+schema: spec-driven
+
+context: |
+  PHP, no framework. Deployed via nixpacks as `php -S 0.0.0.0:$PORT -t .` from the
+  repo root, so routing is filesystem-based. Poster data comes from TMDB, fanart.tv
+  and Mediux.
+
+  Hard constraints:
+  - Never modify anything under api/ — the legacy endpoint serves deprecated Posteria
+    and current Marquee installs. Copy code rather than extracting shared libraries.
+  - Environment variables are added only with the owner's explicit approval, never
+    unilaterally. The legacy set is TMDB_API_KEY, FANART_API_KEY, MEDIUX_API_KEY,
+    POSTERIA_API_KEY; TVDB_API_KEY was added by decision for the Marquee endpoint.
+  - A source that cannot return artwork in this deployment is removed, not left
+    advertised and failing.

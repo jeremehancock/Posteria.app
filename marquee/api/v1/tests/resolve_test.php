@@ -1,0 +1,267 @@
+<?php
+// Fixture harness for resolution, de-duplication, ranking and storage.
+//
+// Uses provider-shaped fixtures rather than live calls, so the accuracy fix is
+// verifiable without credentials and without spending provider quota.
+//
+//   php marquee/api/v1/tests/resolve_test.php
+//
+// CLI only: the deployment serves this tree over HTTP, and a test runner should
+// not be reachable as a URL.
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+define('MARQUEE_API_V1', true);
+$lib = __DIR__ . '/../lib/';
+require_once $lib . 'config.php';
+require_once $lib . 'resolve.php';
+require_once $lib . 'tmdb.php';
+require_once $lib . 'posters.php';
+
+$pass = 0;
+$fail = 0;
+
+function check(string $label, $actual, $expected): void
+{
+    global $pass, $fail;
+    $ok = $actual === $expected;
+    $ok ? $pass++ : $fail++;
+    printf("%-58s %s%s\n", $label, $ok ? 'PASS' : 'FAIL',
+        $ok ? '' : "  (got " . var_export($actual, true) . ", want " . var_export($expected, true) . ")");
+}
+
+function movie(int $id, string $title, ?string $date, float $pop): array
+{
+    return ['id' => $id, 'title' => $title, 'original_title' => $title, 'release_date' => $date, 'popularity' => $pop];
+}
+function show(int $id, string $name, ?string $date, float $pop): array
+{
+    return ['id' => $id, 'name' => $name, 'original_name' => $name, 'first_air_date' => $date, 'popularity' => $pop];
+}
+function coll(int $id, string $name): array
+{
+    return ['id' => $id, 'name' => $name, 'popularity' => 1.0];
+}
+
+// --- The Matrix: the query behind the 683-result problem -------------------
+$matrix = ['results' => [
+    movie(604, 'The Matrix Reloaded', '2003-05-15', 45.0),
+    movie(603, 'The Matrix', '1999-03-30', 62.0),
+    movie(605, 'The Matrix Revolutions', '2003-11-05', 38.0),
+    movie(624860, 'The Matrix Resurrections', '2021-12-16', 41.0),
+    movie(14612, 'The Matrix Revisited', '2001-11-13', 5.0),
+    movie(128280, 'Making "The Matrix"', '1999-09-21', 3.0),
+    movie(999001, 'Sex and the Matrix', '2000-01-01', 1.0),
+    movie(999002, 'A Glitch in the Matrix', '2021-02-05', 9.0),
+    movie(999003, 'The Living Matrix', '2009-01-01', 2.0),
+    movie(999004, 'Exit the matrix', '2026-01-01', 0.5),
+]];
+
+$r = marqueeResolveWork($matrix, 'movie', 'The Matrix', 1999);
+check('Matrix + year 1999 resolves to 603', $r['winner']['tmdb_id'], 603);
+
+$r = marqueeResolveWork($matrix, 'movie', 'The Matrix', null);
+check('Matrix, no year, still resolves to 603', $r['winner']['tmdb_id'], 603);
+
+// Exact title with wrong year is bad metadata for the right work.
+$r = marqueeResolveWork($matrix, 'movie', 'The Matrix', 2003);
+check('Matrix + wrong year 2003 still resolves to 603', $r['winner']['tmdb_id'], 603);
+
+$r = marqueeResolveWork($matrix, 'movie', 'The Matrix Reloaded', null);
+check('Explicit Reloaded resolves to 604', $r['winner']['tmdb_id'], 604);
+
+check('Rejected list is populated for debug', count($r['rejected']) > 0, true);
+
+// --- Breaking Bad ---------------------------------------------------------
+$bb = ['results' => [
+    show(1396, 'Breaking Bad', '2008-01-20', 210.0),
+    show(999010, 'The Bad Guys: The Series', '2022-01-01', 30.0),
+    show(999011, 'Breaking the Deal with My Hockey Bad Boy', '2024-01-01', 6.0),
+    show(999012, 'Breaking Bad: Original Minisodes', '2009-01-01', 4.0),
+]];
+$r = marqueeResolveWork($bb, 'show', 'Breaking Bad', null);
+check('Breaking Bad resolves to 1396', $r['winner']['tmdb_id'], 1396);
+
+// --- Collections ----------------------------------------------------------
+$sw = ['results' => [
+    coll(999020, 'LEGO Star Wars Collection'),
+    coll(10, 'Star Wars Collection'),
+    coll(999021, 'Robot Chicken - Star Wars Collection'),
+    coll(999022, 'Star Wars: The Ewok Adventures Collection'),
+    coll(999023, 'The Man Who Saved the World Collection'),
+]];
+$r = marqueeResolveWork($sw, 'collection', 'Star Wars Collection', null);
+check('Star Wars Collection resolves to 10', $r['winner']['tmdb_id'], 10);
+
+// --- No match -------------------------------------------------------------
+check('Empty results is a no-match', marqueeResolveWork(['results' => []], 'movie', 'Zzzznotarealtitle', null), null);
+
+$junk = ['results' => [
+    movie(999030, 'Something Entirely Different', '2010-01-01', 12.0),
+    movie(999031, 'Another Unrelated Film', '2011-01-01', 8.0),
+]];
+check('Unrelated results fall below the floor', marqueeResolveWork($junk, 'movie', 'Zzzznotarealtitle', null), null);
+
+// --- Normalisation --------------------------------------------------------
+check('Leading article dropped', marqueeNormaliseTitle('The Matrix'), 'matrix');
+check('Punctuation and case normalised', marqueeNormaliseTitle('WALL·E: The  Movie!'), 'wall e the movie');
+check('Diacritics folded', marqueeNormaliseTitle('Amélie'), 'amelie');
+$r = marqueeResolveWork($matrix, 'movie', 'the   MATRIX', null);
+check('Sloppy spelling resolves identically', $r['winner']['tmdb_id'], 603);
+
+// --- Season identity ------------------------------------------------------
+$s = marqueeBuildSeasonIdentity(0, ['name' => 'Specials', 'air_date' => '2009-02-17', 'episodes' => [[], [], []]]);
+check('Specials keeps number 0', $s['number'], 0);
+check('Specials episode count', $s['episode_count'], 3);
+$s = marqueeBuildSeasonIdentity(2, null);
+check('Season falls back to a sane name', $s['name'], 'Season 2');
+
+// --- Poster mapping, de-duplication, ranking ------------------------------
+$images = ['posters' => [
+    ['file_path' => '/a.jpg', 'width' => 2000, 'height' => 3000, 'iso_639_1' => 'en', 'vote_average' => 8.2, 'vote_count' => 12],
+    ['file_path' => '/b.jpg', 'width' => 1000, 'height' => 1500, 'iso_639_1' => null, 'vote_average' => 0, 'vote_count' => 0],
+    ['file_path' => '/a.jpg', 'width' => 2000, 'height' => 3000, 'iso_639_1' => 'en', 'vote_average' => 8.2, 'vote_count' => 12],
+]];
+$mapped = marqueeTmdbPosters($images);
+check('TMDB images mapped', count($mapped), 3);
+check('url is original size', $mapped[0]['url'], 'https://image.tmdb.org/t/p/original/a.jpg');
+check('thumb is w342', $mapped[0]['thumb'], 'https://image.tmdb.org/t/p/w342/a.jpg');
+check('score carried when rated', $mapped[0]['score'], 8.2);
+check('score omitted when unrated', array_key_exists('score', $mapped[1]), false);
+check('language omitted when null', array_key_exists('language', $mapped[1]), false);
+
+$mixed = array_merge($mapped, [
+    ['url' => 'https://assets.fanart.tv/x.jpg', 'source' => 'fanart.tv', 'language' => 'en'],
+    ['url' => 'https://assets.fanart.tv/y.jpg', 'source' => 'fanart.tv'],
+    ['url' => 'https://assets.fanart.tv/x.jpg', 'source' => 'fanart.tv', 'language' => 'en'],
+]);
+$assembled = marqueeAssemblePosters($mixed, 200);
+$urls = array_column($assembled['posters'], 'url');
+check('duplicates removed', count($urls), count(array_unique($urls)));
+check('total is post-dedup', $assembled['total'], 4);
+check('english art ranks first', $assembled['posters'][0]['source'], 'tmdb');
+check('rated english outranks unrated english', $assembled['posters'][1]['source'], 'fanart.tv');
+
+$capped = marqueeAssemblePosters($mixed, 2);
+check('limit applied after ranking', count($capped['posters']), 2);
+check('total ignores the limit', $capped['total'], 4);
+
+// Stability: the same input twice orders identically.
+$a = array_column(marqueeAssemblePosters($mixed, 200)['posters'], 'url');
+shuffle($mixed);
+$b = array_column(marqueeAssemblePosters($mixed, 200)['posters'], 'url');
+check('ranking is order-independent and stable', $a, $b);
+
+// --- fanart season filtering ---------------------------------------------
+require_once $lib . 'sources.php';
+$fanart = ['seasonposter' => [
+    ['url' => 'https://f/s0.jpg', 'season' => '0', 'lang' => 'en'],
+    ['url' => 'https://f/s2a.jpg', 'season' => '2', 'lang' => 'en'],
+    ['url' => 'https://f/s2b.jpg', 'season' => '2', 'lang' => '00'],
+    ['url' => 'https://f/s3.jpg', 'season' => '3', 'lang' => 'en'],
+    ['url' => 'https://f/all.jpg', 'season' => 'all', 'lang' => 'en'],
+], 'tvposter' => [
+    ['url' => 'https://f/show.jpg', 'lang' => 'en'],
+]];
+check('season 2 filter', count(marqueeMapFanartPosters($fanart, 'season', 2)), 2);
+check('season 0 filter (Specials)', count(marqueeMapFanartPosters($fanart, 'season', 0)), 1);
+check('season query never takes tvposter', array_column(marqueeMapFanartPosters($fanart, 'season', 2), 'url'),
+    ['https://f/s2a.jpg', 'https://f/s2b.jpg']);
+check('show query never takes seasonposter', array_column(marqueeMapFanartPosters($fanart, 'show', null), 'url'),
+    ['https://f/show.jpg']);
+check('fanart attributed to fanart.tv', marqueeMapFanartPosters($fanart, 'show', null)[0]['source'], 'fanart.tv');
+check('language-neutral 00 omitted', array_key_exists('language', marqueeMapFanartPosters($fanart, 'season', 2)[1]), false);
+
+// --- Source set -----------------------------------------------------------
+// Mediux is not a source here: its staging host is gone and the production host
+// rejects this deployment's credential.
+check('selectable sources', VALID_SOURCE_TOKENS, ['tmdb', 'fanart', 'tvdb']);
+check('no mediux label', array_key_exists('mediux', SOURCE_LABELS), false);
+check('no mediux mapper', function_exists('marqueeMapMediuxPosters'), false);
+check('mediux credential not read', array_key_exists('mediux', marqueeCredentials()), false);
+
+// --- TheTVDB --------------------------------------------------------------
+require_once $lib . 'tvdb.php';
+
+// A remote-id lookup can return several records: the numeric TMDB movie id 603
+// also matches an unrelated series. Filtering by record type is what stops the
+// wrong work's artwork being attached.
+$remote = ['data' => [
+    ['series' => ['id' => 77013, 'name' => "Veronica's Closet"]],
+    ['movie' => ['id' => 169, 'name' => 'The Matrix']],
+]];
+check('remote id picks the movie record', marqueeTvdbFindByRemoteId($remote, 'movie'), 169);
+check('remote id picks the series record', marqueeTvdbFindByRemoteId($remote, 'series'), 77013);
+check('remote id with no such type', marqueeTvdbFindByRemoteId(['data' => []], 'movie'), null);
+
+check('639-3 mapped to 639-1', marqueeTvdbLanguage('eng'), 'en');
+check('alternate 639-2/B code mapped', marqueeTvdbLanguage('ger'), 'de');
+check('unknown code passed through', marqueeTvdbLanguage('xyz'), 'xyz');
+check('absent language stays null', marqueeTvdbLanguage(null), null);
+
+$artworks = [
+    ['image' => 'https://a/p1.jpg', 'thumbnail' => 'https://a/p1_t.jpg', 'language' => 'eng',
+     'type' => 14, 'score' => 100003, 'width' => 680, 'height' => 1000],
+    ['image' => 'https://a/bg.jpg', 'type' => 15, 'score' => 100000],
+    ['image' => 'https://a/p2.jpg', 'language' => 'rus', 'type' => 14, 'width' => 680, 'height' => 1000],
+];
+$mapped = marqueeTvdbPosters($artworks, 14);
+check('only the wanted artwork type', count($mapped), 2);
+check('tvdb attributed to thetvdb', $mapped[0]['source'], 'thetvdb');
+check('tvdb thumbnail carried', $mapped[0]['thumb'], 'https://a/p1_t.jpg');
+check('tvdb language normalised', $mapped[0]['language'], 'en');
+// TheTVDB scores run in the hundred-thousands; carrying one across would rank
+// every TheTVDB poster above every rated TMDB one regardless of quality.
+check('tvdb score never carried', array_key_exists('score', $mapped[0]), false);
+check('missing thumbnail omitted', array_key_exists('thumb', $mapped[1]), false);
+check('tvdb garbage yields nothing', marqueeTvdbPosters(null, 14), []);
+
+$seriesExtended = ['data' => ['seasons' => [
+    ['id' => 30272, 'number' => 1, 'type' => ['type' => 'official']],
+    ['id' => 40719, 'number' => 2, 'type' => ['type' => 'official']],
+    ['id' => 999999, 'number' => 2, 'type' => ['type' => 'dvd']],
+    ['id' => 439371, 'number' => 0, 'type' => ['type' => 'official']],
+]]];
+check('season id by number', marqueeTvdbSeasonId($seriesExtended, 2), 40719);
+check('specials season id', marqueeTvdbSeasonId($seriesExtended, 0), 439371);
+check('alternate orderings ignored', marqueeTvdbSeasonId($seriesExtended, 2) !== 999999, true);
+check('absent season', marqueeTvdbSeasonId($seriesExtended, 9), null);
+
+// --- Provider verdicts ----------------------------------------------------
+check('all ok is not partial',
+    marqueeSummariseProviders(['tmdb' => 'ok', 'fanart.tv' => 'ok']), 'ok');
+check('no_data is not a failure',
+    marqueeSummariseProviders(['tmdb' => 'ok', 'fanart.tv' => 'no_data']), 'ok');
+check('one failure of several is partial',
+    marqueeSummariseProviders(['tmdb' => 'ok', 'fanart.tv' => 'error']), 'partial');
+check('failure alongside no_data is partial',
+    marqueeSummariseProviders(['tmdb' => 'no_data', 'fanart.tv' => 'error']), 'partial');
+check('every queried source failing is all_failed',
+    marqueeSummariseProviders(['tmdb' => 'error', 'fanart.tv' => 'error']), 'all_failed');
+check('skipped sources never make a response partial',
+    marqueeSummariseProviders(['tmdb' => 'ok', 'fanart.tv' => 'skipped']), 'ok');
+check('a lone failure with the rest skipped is all_failed',
+    marqueeSummariseProviders(['tmdb' => 'error', 'fanart.tv' => 'skipped']), 'all_failed');
+check('everything skipped is not a failure',
+    marqueeSummariseProviders(['tmdb' => 'skipped', 'fanart.tv' => 'skipped']), 'ok');
+
+// --- Storage --------------------------------------------------------------
+require_once $lib . 'store.php';
+$key = 'test:' . bin2hex(random_bytes(6));
+marqueeStoreSet($key, ['hello' => 'world'], 60);
+check('cache round-trips', marqueeStoreGet($key), ['hello' => 'world']);
+check('cache miss returns null', marqueeStoreGet('test:absent:' . bin2hex(random_bytes(6))), null);
+
+marqueeStoreSet($key . ':expired', ['stale' => true], -1);
+check('expired entry reads as a miss', marqueeStoreGet($key . ':expired'), null);
+
+$counterKey = 'test:counter:' . bin2hex(random_bytes(6));
+check('counter starts at 1', marqueeStoreIncrement($counterKey, 60), 1);
+check('counter increments', marqueeStoreIncrement($counterKey, 60), 2);
+check('counter increments again', marqueeStoreIncrement($counterKey, 60), 3);
+
+printf("\n%d passed, %d failed\n", $pass, $fail);
+exit($fail === 0 ? 0 : 1);
