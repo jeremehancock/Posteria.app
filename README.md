@@ -12,8 +12,11 @@
 > fixes, or support. Migrating to Marquee is strongly recommended.
 > The Posteria repo is still available at [jeremehancock/Posteria](https://github.com/jeremehancock/Posteria).
 >
-> **The Find Poster API stays here.** It is not moving to Marquee. It remains on the **posteria.app** domain, so
-> anything using it will keep working.
+> **The Find Poster API stays here.** It is not moving to Marquee. It remains on the **posteria.app** domain and is
+> actively maintained.
+>
+> **The legacy API is not.** It still runs, but like Posteria itself it is unmaintained — no new features, fixes, or
+> support.
 
 This repository contains the landing page for Posteria, a media poster management system. The page is built with HTML, CSS, and vanilla JavaScript.
 
