@@ -100,6 +100,16 @@ get bb_s2.json "q=Breaking+Bad&type=season&season=2" >/dev/null
 check "season 2 resolves" "$([[ $(jq_py bb_s2.json "d['match']['season']['number']") == 2 ]] && echo 1 || echo 0)" \
   "$(jq_py bb_s2.json "repr(d['match']['season'])")"
 check "season 2 returns art" "$(jq_py bb_s2.json "int(d['total']>0)")" "total=$(jq_py bb_s2.json "d['total']")"
+# match.tmdb_id on a season is the SHOW's id, never a season-level id. Clients
+# store this value and send it back with season=N, so a regression here is
+# invisible on the client — both are positive integers — and would silently
+# poison every stored season mapping.
+check "season match.tmdb_id is the show's id" \
+  "$([[ $(jq_py bb_s2.json "d['match']['tmdb_id']") == 1396 ]] && echo 1 || echo 0)" \
+  "match.tmdb_id=$(jq_py bb_s2.json "d['match']['tmdb_id']") (show=1396)"
+check "season match.tmdb_id equals the show request's id" \
+  "$([[ $(jq_py bb_s2.json "d['match']['tmdb_id']") == $(jq_py bb_show.json "d['match']['tmdb_id']") ]] && echo 1 || echo 0)" \
+  "season=$(jq_py bb_s2.json "d['match']['tmdb_id']") show=$(jq_py bb_show.json "d['match']['tmdb_id']")"
 check "no duplicate urls" "$(jq_py bb_s2.json "int(len({p['url'] for p in d['posters']})==len(d['posters']))")"
 # A season request must never fetch show-level artwork. Asserted structurally
 # from the debug call list rather than by comparing URL sets: TMDB files some
@@ -219,6 +229,39 @@ check "season by show id returns season 2" \
   "$(jq_py byid_season.json "repr(d.get('match',{}).get('season'))")"
 check "season by show id returns art" \
   "$(jq_py byid_season.json "int(d['total']>0)")" "total=$(jq_py byid_season.json "d['total']")"
+check "season by id echoes the show id back as match.tmdb_id" \
+  "$([[ $(jq_py byid_season.json "d['match']['tmdb_id']") == 1396 ]] && echo 1 || echo 0)" \
+  "match.tmdb_id=$(jq_py byid_season.json "d['match']['tmdb_id']")"
+check "season id round-trips unchanged" \
+  "$(jq_py byid_season.json "int(d['query']['tmdb_id'] == d['match']['tmdb_id'])")" \
+  "query=$(jq_py byid_season.json "d['query']['tmdb_id']") match=$(jq_py byid_season.json "d['match']['tmdb_id']")"
+
+# --- query echo -------------------------------------------------------------
+# `query` belongs to the caller, not to the resolved work, but the artwork cache
+# is keyed on the work. A cached payload must not carry the `query` block of
+# whichever request happened to populate the entry: that reports another caller's
+# search text and another caller's tmdb_id, which silently breaks stale-id
+# detection and leaks one caller's query to the next.
+get echo_seed.json "q=ZZ_ECHO_SEED&type=movie&tmdb_id=603&limit=1&sources=tmdb" >/dev/null
+check "seeding request echoes its own q" \
+  "$([[ $(jq_py echo_seed.json "repr(d['query']['q'])") == "'ZZ_ECHO_SEED'" ]] && echo 1 || echo 0)" \
+  "$(jq_py echo_seed.json "repr(d['query']['q'])")"
+check "seeding request echoes its own tmdb_id" \
+  "$([[ $(jq_py echo_seed.json "d['query']['tmdb_id']") == 603 ]] && echo 1 || echo 0)"
+
+# Same cache key (same work, same sources, same limit), different caller.
+get echo_hit.json "q=The+Matrix&type=movie&limit=1&sources=tmdb" >/dev/null
+check "cache hit echoes THIS caller's q" \
+  "$([[ $(jq_py echo_hit.json "repr(d['query']['q'])") == "'The Matrix'" ]] && echo 1 || echo 0)" \
+  "$(jq_py echo_hit.json "repr(d['query']['q'])")"
+check "cache hit reports tmdb_id null when none was sent" \
+  "$(jq_py echo_hit.json "int(d['query']['tmdb_id'] is None)")" \
+  "$(jq_py echo_hit.json "repr(d['query']['tmdb_id'])")"
+check "cache hit still serves the cached work" \
+  "$([[ $(jq_py echo_hit.json "d['match']['tmdb_id']") == 603 ]] && echo 1 || echo 0)"
+check "query keeps its position in the response" \
+  "$(jq_py echo_hit.json "int(list(d.keys())[:2]==['success','query'])")" \
+  "keys=$(jq_py echo_hit.json "list(d.keys())")"
 
 # A stale id falls back to the title, and the fallback is visible without debug.
 S=$(get stale.json "q=Breaking+Bad&type=show&tmdb_id=99999999&debug=true")

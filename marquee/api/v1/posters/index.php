@@ -45,6 +45,23 @@ marqueeEnforceRateLimit(marqueeClientIp());
 $request = marqueeParseRequest($_GET);
 $startedAt = microtime(true);
 
+// The interpreted request, echoed back on every success.
+//
+// Built once and applied to cached responses as well as fresh ones. The artwork
+// cache is keyed on the resolved work, not on the text that found it, so a cached
+// payload carries the `query` block of whichever request happened to populate it —
+// a different `q`, and a different `tmdb_id`, belonging to a different caller.
+//
+// `query.tmdb_id` is what this caller sent, or null. `match.tmdb_id` is what the
+// response describes. Clients compare the two to detect an identifier that has
+// gone stale, so serving a cached echo silently breaks that check.
+$queryEcho = [
+    'q' => $request['q'],
+    'type' => $request['type'],
+    'tmdb_id' => $request['tmdb_id'],
+    'season' => $request['season'],
+];
+
 // TMDB is the resolution provider as well as an artwork source: every other
 // source is keyed on an identifier that only TMDB can supply. So a request that
 // excludes `tmdb` still resolves through TMDB; it just gets no TMDB artwork.
@@ -171,6 +188,15 @@ while (true) {
 
     $cached = marqueeStoreGet($cacheKey);
     if (is_array($cached) && isset($cached['success'])) {
+        // Everything else in a cached payload describes the resolved work and the
+        // shaping parameters, both of which are in the cache key. `query` is the
+        // one part that belongs to the caller rather than to the work.
+        //
+        // Rebuilt rather than assigned so `query` keeps its position in the
+        // response, and so an entry stored before it was dropped is corrected
+        // rather than trusted — the left operand of `+` wins on a key clash.
+        $cached = ['success' => $cached['success'], 'query' => $queryEcho] + $cached;
+
         if ($request['debug']) {
             // `calls` is present but empty rather than absent: a cache hit made no
             // upstream calls, and the debug shape should not change between a hit
@@ -339,16 +365,7 @@ $assembled = marqueeAssemblePosters(array_merge($tmdbPosters, $external['posters
 
 $payload = [
     'success' => true,
-    // `query.tmdb_id` is what the client asked for; `match.tmdb_id` is what the
-    // response describes. When they differ, the identifier was unknown upstream
-    // and the title was used instead — which is how a client detects that its
-    // stored id has gone stale, without having to request debug output.
-    'query' => [
-        'q' => $request['q'],
-        'type' => $request['type'],
-        'tmdb_id' => $request['tmdb_id'],
-        'season' => $request['season'],
-    ],
+    'query' => $queryEcho,
     'match' => $match,
     'posters' => $assembled['posters'],
     'total' => $assembled['total'],
@@ -364,7 +381,13 @@ if ($verdict === 'partial') {
     );
 } else {
     // A partial result would poison the cache for everyone behind it.
-    marqueeStoreSet($cacheKey, $payload, CACHE_TTL_SECONDS);
+    //
+    // `query` is dropped from the stored copy rather than merely overwritten on
+    // read: the entry is shared by every caller who resolves to this work, and
+    // there is no reason to persist one caller's search text in it.
+    $toCache = $payload;
+    unset($toCache['query']);
+    marqueeStoreSet($cacheKey, $toCache, CACHE_TTL_SECONDS);
 }
 
 marqueeLogRequest([
