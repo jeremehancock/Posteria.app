@@ -21,7 +21,7 @@ function marqueeInvalidRequest(string $message): void
 
 /**
  * @return array{
- *   q: string, type: string, season: ?int, year: ?int,
+ *   q: string, type: string, tmdb_id: ?int, season: ?int, year: ?int,
  *   limit: int, sources: string[], debug: bool
  * }
  */
@@ -38,6 +38,21 @@ function marqueeParseRequest(array $query): array
     }
     if (!in_array($type, VALID_TYPES, true)) {
         marqueeInvalidRequest('Parameter "type" must be one of: ' . implode(', ', VALID_TYPES) . '.');
+    }
+
+    // An identifier the caller already holds, which makes title resolution
+    // unnecessary. `q` stays required regardless: it is the fallback for when the
+    // identifier turns out to be unknown upstream.
+    $tmdbId = null;
+    $rawTmdbId = $query['tmdb_id'] ?? null;
+    if (is_string($rawTmdbId)) {
+        $rawTmdbId = trim($rawTmdbId);
+    }
+    if ($rawTmdbId !== null && $rawTmdbId !== '') {
+        if (!is_string($rawTmdbId) || !ctype_digit($rawTmdbId) || (int) $rawTmdbId < 1) {
+            marqueeInvalidRequest('Parameter "tmdb_id" must be an integer of 1 or greater.');
+        }
+        $tmdbId = (int) $rawTmdbId;
     }
 
     $season = null;
@@ -107,6 +122,7 @@ function marqueeParseRequest(array $query): array
     return [
         'q' => $q,
         'type' => $type,
+        'tmdb_id' => $tmdbId,
         'season' => $season,
         'year' => $year,
         'limit' => $limit,

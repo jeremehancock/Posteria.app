@@ -57,19 +57,31 @@ if ($credentials['tmdb'] === null) {
 
 $includeTmdbArtwork = in_array('tmdb', $request['sources'], true);
 
-// --- Resolve ------------------------------------------------------------
-// The resolution is cached separately from the artwork so that a repeat search
-// skips the search call too, not just the artwork fan-out.
-// Normalised for the type, so the two vocabularies for one collection — the
-// media server's "Star Wars" and the provider's "Star Wars Collection" — share a
-// single entry rather than each paying for its own search.
-$resolutionKey = 'resolve:' . $request['type'] . ':'
-    . marqueeNormaliseTitleForType($request['q'], $request['type'])
-    . ':' . ($request['year'] ?? '');
+/**
+ * Resolve the request's title to one work, or fail the request.
+ *
+ * Extracted because it serves two callers: a request that supplied no
+ * identifier, and one whose identifier the provider turned out not to have.
+ * Never returns on a no-match — it emits the 404 and exits.
+ *
+ * @return array{winner: array, score: float, rejected: array}
+ */
+function marqueeResolveRequestByTitle(array $request, array $credentials): array
+{
+    // The resolution is cached separately from the artwork so that a repeat search
+    // skips the search call too, not just the artwork fan-out.
+    // Normalised for the type, so the two vocabularies for one collection — the
+    // media server's "Star Wars" and the provider's "Star Wars Collection" — share
+    // a single entry rather than each paying for its own search.
+    $resolutionKey = 'resolve:' . $request['type'] . ':'
+        . marqueeNormaliseTitleForType($request['q'], $request['type'])
+        . ':' . ($request['year'] ?? '');
 
-$resolution = marqueeStoreGet($resolutionKey);
+    $resolution = marqueeStoreGet($resolutionKey);
+    if (is_array($resolution)) {
+        return $resolution;
+    }
 
-if (!is_array($resolution)) {
     $searchResponse = marqueeTmdbSearch($request['type'], $request['q'], $request['year'], $credentials['tmdb']);
 
     if (!$searchResponse['ok']) {
@@ -79,13 +91,13 @@ if (!is_array($resolution)) {
         );
     }
 
-    $resolutionDiagnostics = null;
+    $diagnostics = null;
     $resolution = marqueeResolveWork(
         $searchResponse['json'],
         $request['type'],
         $request['q'],
         $request['year'],
-        $resolutionDiagnostics
+        $diagnostics
     );
 
     if ($resolution === null) {
@@ -96,7 +108,8 @@ if (!is_array($resolution)) {
         $extra = [];
         if ($request['debug']) {
             $extra['debug'] = [
-                'resolution' => $resolutionDiagnostics,
+                'identified_by' => $request['tmdb_id'] === null ? 'title' : 'tmdb_id_unknown_then_title',
+                'resolution' => $diagnostics,
                 'calls' => [[
                     'source' => SOURCE_LABELS['tmdb'],
                     'call' => 'search',
@@ -115,42 +128,100 @@ if (!is_array($resolution)) {
     }
 
     marqueeStoreSet($resolutionKey, $resolution, CACHE_TTL_SECONDS);
+
+    return $resolution;
 }
 
-$winner = $resolution['winner'];
+// --- Identify -----------------------------------------------------------
+// A supplied identifier makes resolution unnecessary: resolution's only output
+// is a tmdb_id, and everything downstream keys off it. The client's title is
+// carried as a placeholder until the provider's details arrive, after which
+// marqueeBuildMatch() replaces it with the real one.
+if ($request['tmdb_id'] !== null) {
+    $identifiedBy = 'tmdb_id';
+    $resolution = null;
+    $winner = [
+        'tmdb_id' => $request['tmdb_id'],
+        'title' => $request['q'],
+        'year' => null,
+        'score' => null,
+    ];
+} else {
+    $identifiedBy = 'title';
+    $resolution = marqueeResolveRequestByTitle($request, $credentials);
+    $winner = $resolution['winner'];
+}
 
-// --- Artwork cache ------------------------------------------------------
-// Keyed on the resolved work rather than the raw query, so different spellings
-// and year hints that land on the same work share one entry.
-$sortedSources = $request['sources'];
-sort($sortedSources);
-$cacheKey = 'posters:' . $request['type'] . ':' . $winner['tmdb_id']
-    . ':' . ($request['season'] ?? 'none')
-    . ':' . implode(',', $sortedSources)
-    . ':' . $request['limit'];
+// The cache lookup and the details call run once normally, and a second time
+// only when a supplied identifier turns out to be unknown upstream.
+$attempt = 0;
 
-$cached = marqueeStoreGet($cacheKey);
-if (is_array($cached) && isset($cached['success'])) {
-    if ($request['debug']) {
-        // `calls` is present but empty rather than absent: a cache hit made no
-        // upstream calls, and the debug shape should not change between a hit and
-        // a miss.
-        $cached['debug'] = ['cache' => 'hit', 'resolution' => $resolution, 'calls' => []];
+while (true) {
+    $attempt++;
+
+    // --- Artwork cache --------------------------------------------------
+    // Keyed on the resolved work rather than the raw query, so different
+    // spellings, year hints and a supplied identifier all share one entry.
+    $sortedSources = $request['sources'];
+    sort($sortedSources);
+    $cacheKey = 'posters:' . $request['type'] . ':' . $winner['tmdb_id']
+        . ':' . ($request['season'] ?? 'none')
+        . ':' . implode(',', $sortedSources)
+        . ':' . $request['limit'];
+
+    $cached = marqueeStoreGet($cacheKey);
+    if (is_array($cached) && isset($cached['success'])) {
+        if ($request['debug']) {
+            // `calls` is present but empty rather than absent: a cache hit made no
+            // upstream calls, and the debug shape should not change between a hit
+            // and a miss.
+            $cached['debug'] = [
+                'cache' => 'hit',
+                'identified_by' => $identifiedBy,
+                'resolution' => $resolution,
+                'calls' => [],
+            ];
+        }
+        marqueeLogRequest([
+            'client' => $client['name'],
+            'version' => $client['version'],
+            'query' => $request,
+            'match' => $cached['match'] ?? null,
+            'providers' => $cached['providers'] ?? null,
+            'cache' => 'hit',
+            'ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
+        marqueeSendSuccess($cached);
     }
-    marqueeLogRequest([
-        'client' => $client['name'],
-        'version' => $client['version'],
-        'query' => $request,
-        'match' => $cached['match'] ?? null,
-        'providers' => $cached['providers'] ?? null,
-        'cache' => 'hit',
-        'ms' => (int) round((microtime(true) - $startedAt) * 1000),
-    ]);
-    marqueeSendSuccess($cached);
+
+    // --- Gather ---------------------------------------------------------
+    $workResponses = marqueeTmdbWorkDetails($request['type'], $winner['tmdb_id'], $credentials['tmdb']);
+
+    // A 404 on details means the provider does not have that identifier: the
+    // client's stored id is stale, so fall back to the title it also sent.
+    //
+    // Only a 404 does this. A timeout or a 5xx may well be a perfectly good id
+    // behind an unreachable provider, and searching by title there could serve a
+    // different work's artwork during an outage — those stay with the ordinary
+    // provider-failure handling below.
+    //
+    // A work that is found but simply has no artwork is NOT this case. It is a
+    // success with an empty poster list, and falling back would gather some other
+    // work's posters and present them under this item's identity.
+    if (
+        $attempt === 1
+        && $identifiedBy === 'tmdb_id'
+        && ($workResponses['details']['status'] ?? 0) === 404
+    ) {
+        $identifiedBy = 'tmdb_id_unknown_then_title';
+        $resolution = marqueeResolveRequestByTitle($request, $credentials);
+        $winner = $resolution['winner'];
+        continue;
+    }
+
+    break;
 }
 
-// --- Gather -------------------------------------------------------------
-$workResponses = marqueeTmdbWorkDetails($request['type'], $winner['tmdb_id'], $credentials['tmdb']);
 $details = ($workResponses['details']['ok'] ?? false) ? $workResponses['details']['json'] : null;
 
 $match = marqueeBuildMatch($request['type'], $winner, $details);
@@ -194,12 +265,14 @@ if ($request['type'] === 'season') {
         $extra = [];
         if ($request['debug']) {
             $extra['debug'] = [
+                'identified_by' => $identifiedBy,
                 'resolution' => [
                     'winner' => [
                         'tmdb_id' => $winner['tmdb_id'],
                         'title' => $match['title'],
                         'year' => $match['year'],
-                        'score' => $winner['score'] ?? $resolution['score'],
+                        // Null when the work was identified by id: nothing was scored.
+                        'score' => $winner['score'] ?? ($resolution['score'] ?? null),
                     ],
                     'season_requested' => $request['season'],
                 ],
@@ -266,9 +339,14 @@ $assembled = marqueeAssemblePosters(array_merge($tmdbPosters, $external['posters
 
 $payload = [
     'success' => true,
+    // `query.tmdb_id` is what the client asked for; `match.tmdb_id` is what the
+    // response describes. When they differ, the identifier was unknown upstream
+    // and the title was used instead — which is how a client detects that its
+    // stored id has gone stale, without having to request debug output.
     'query' => [
         'q' => $request['q'],
         'type' => $request['type'],
+        'tmdb_id' => $request['tmdb_id'],
         'season' => $request['season'],
     ],
     'match' => $match,
@@ -303,15 +381,20 @@ marqueeLogRequest([
 if ($request['debug']) {
     $payload['debug'] = [
         'cache' => 'miss',
+        // How the work was identified: `tmdb_id` (no title search was made),
+        // `tmdb_id_unknown_then_title` (the supplied id was not found upstream), or
+        // `title`.
+        'identified_by' => $identifiedBy,
         'resolution' => [
             'query_normalised' => marqueeNormaliseTitleForType($request['q'], $request['type']),
             'winner' => [
                 'tmdb_id' => $winner['tmdb_id'],
                 'title' => $winner['title'],
                 'year' => $winner['year'],
-                'score' => $winner['score'] ?? $resolution['score'],
+                // Both null when identified by id: no candidate was ever scored.
+                'score' => $winner['score'] ?? ($resolution['score'] ?? null),
             ],
-            'rejected' => $resolution['rejected'],
+            'rejected' => $resolution['rejected'] ?? [],
             'score_floor' => RESOLVE_SCORE_FLOOR,
         ],
         'calls' => $debugCalls,

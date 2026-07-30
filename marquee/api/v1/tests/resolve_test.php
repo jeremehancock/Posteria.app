@@ -372,5 +372,42 @@ check('counter starts at 1', marqueeStoreIncrement($counterKey, 60), 1);
 check('counter increments', marqueeStoreIncrement($counterKey, 60), 2);
 check('counter increments again', marqueeStoreIncrement($counterKey, 60), 3);
 
+// --- Request parsing ------------------------------------------------------
+// Run in a subprocess: marqueeParseRequest() answers a bad parameter by emitting
+// the failure envelope and exiting, which would take the whole run with it.
+function parseRequest(array $get): array
+{
+    $lib = __DIR__ . '/../lib/';
+    $code = 'define("MARQUEE_API_V1", true);'
+        . 'require ' . var_export($lib . 'config.php', true) . ';'
+        . 'require ' . var_export($lib . 'response.php', true) . ';'
+        . 'require ' . var_export($lib . 'request.php', true) . ';'
+        . 'echo json_encode(marqueeParseRequest(' . var_export($get, true) . '));';
+
+    $out = shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>/dev/null');
+    $decoded = json_decode((string) $out, true);
+
+    return is_array($decoded) ? $decoded : ['code' => 'undecodable', 'raw' => $out];
+}
+
+$base = ['q' => 'The Matrix', 'type' => 'movie'];
+
+check('tmdb_id absent parses as null', parseRequest($base)['tmdb_id'], null);
+check('tmdb_id parses to an int', parseRequest($base + ['tmdb_id' => '603'])['tmdb_id'], 603);
+check('tmdb_id tolerates surrounding space', parseRequest($base + ['tmdb_id' => ' 603 '])['tmdb_id'], 603);
+check('empty tmdb_id is treated as absent', parseRequest($base + ['tmdb_id' => ''])['tmdb_id'], null);
+
+check('non-numeric tmdb_id is rejected', parseRequest($base + ['tmdb_id' => 'abc'])['code'], 'invalid_request');
+check('zero tmdb_id is rejected', parseRequest($base + ['tmdb_id' => '0'])['code'], 'invalid_request');
+check('negative tmdb_id is rejected', parseRequest($base + ['tmdb_id' => '-1'])['code'], 'invalid_request');
+check('decimal tmdb_id is rejected', parseRequest($base + ['tmdb_id' => '603.5'])['code'], 'invalid_request');
+
+// q stays required: it is the fallback when the identifier is unknown upstream.
+check(
+    'tmdb_id without q is still rejected',
+    parseRequest(['type' => 'movie', 'tmdb_id' => '603'])['code'],
+    'invalid_request'
+);
+
 printf("\n%d passed, %d failed\n", $pass, $fail);
 exit($fail === 0 ? 0 : 1);

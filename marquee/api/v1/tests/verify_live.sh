@@ -192,6 +192,74 @@ check "no debug key on a 404 when not requested" \
   "$(jq_py nomatch.json "int('debug' not in d)")"
 
 echo
+echo "=== 6.9 Identification by tmdb_id ==="
+# A supplied id skips title resolution entirely. The deliberately wrong title
+# proves it: if the title were consulted at all, this would not return 603.
+get byid.json "q=Totally+Wrong+Title&type=movie&tmdb_id=603&debug=true" >/dev/null
+check "id resolves regardless of the title" \
+  "$([[ $(jq_py byid.json "d['match']['tmdb_id']") == 603 ]] && echo 1 || echo 0)" \
+  "$(jq_py byid.json "repr(d.get('match',{}).get('title'))")"
+check "id path returns artwork" "$(jq_py byid.json "int(d['total']>0)")" "total=$(jq_py byid.json "d['total']")"
+check "match title comes from the provider, not the client" \
+  "$([[ $(jq_py byid.json "repr(d['match']['title'])") == "'The Matrix'" ]] && echo 1 || echo 0)" \
+  "$(jq_py byid.json "repr(d['match']['title'])")"
+check "query echoes the supplied id" \
+  "$([[ $(jq_py byid.json "d['query']['tmdb_id']") == 603 ]] && echo 1 || echo 0)"
+check "debug reports identification by id" \
+  "$([[ $(jq_py byid.json "d['debug']['identified_by']") == tmdb_id ]] && echo 1 || echo 0)" \
+  "$(jq_py byid.json "repr(d['debug'].get('identified_by'))")"
+check "id path makes no search call" \
+  "$(jq_py byid.json "int(not any(c.get('call')=='search' for c in d['debug']['calls']))")" \
+  "calls=$(jq_py byid.json "[c.get('call') for c in d['debug']['calls'] if c.get('call')]")"
+
+# Season: the id is the SHOW's, paired with a season number.
+get byid_season.json "q=Breaking+Bad&type=season&season=2&tmdb_id=1396" >/dev/null
+check "season by show id returns season 2" \
+  "$([[ $(jq_py byid_season.json "d['match']['season']['number']") == 2 ]] && echo 1 || echo 0)" \
+  "$(jq_py byid_season.json "repr(d.get('match',{}).get('season'))")"
+check "season by show id returns art" \
+  "$(jq_py byid_season.json "int(d['total']>0)")" "total=$(jq_py byid_season.json "d['total']")"
+
+# A stale id falls back to the title, and the fallback is visible without debug.
+S=$(get stale.json "q=Breaking+Bad&type=show&tmdb_id=99999999&debug=true")
+check "stale id falls back to the title" \
+  "$([[ $S == 200 && $(jq_py stale.json "d['match']['tmdb_id']") == 1396 ]] && echo 1 || echo 0)" \
+  "status=$S match=$(jq_py stale.json "d.get('match',{}).get('tmdb_id')")"
+check "fallback is detectable without debug" \
+  "$(jq_py stale.json "int(d['query']['tmdb_id'] != d['match']['tmdb_id'])")" \
+  "query=$(jq_py stale.json "d['query']['tmdb_id']") match=$(jq_py stale.json "d['match']['tmdb_id']")"
+check "debug reports the fallback" \
+  "$([[ $(jq_py stale.json "d['debug']['identified_by']") == tmdb_id_unknown_then_title ]] && echo 1 || echo 0)" \
+  "$(jq_py stale.json "repr(d['debug'].get('identified_by'))")"
+
+# A stale id whose title also matches nothing is still a plain 404.
+S=$(get stale_nomatch.json "q=Zzzznotarealtitle&type=movie&tmdb_id=99999999")
+check "stale id + unmatchable title is a 404" "$([[ $S == 404 ]] && echo 1 || echo 0)" "status=$S"
+check "and the code is no_match" \
+  "$([[ $(jq_py stale_nomatch.json "d['code']") == no_match ]] && echo 1 || echo 0)"
+
+# The case this change exists for: a locally annotated title that cannot resolve
+# on its own, rescued by the id.
+S=$(get annotated.json "q=Spider-Noir+B%26W&type=show")
+check "annotated title alone still 404s" "$([[ $S == 404 ]] && echo 1 || echo 0)" "status=$S"
+SNID=$(get spidernoir.json "q=Spider-Noir&type=show" >/dev/null; jq_py spidernoir.json "d['match']['tmdb_id']")
+S=$(get annotated_id.json "q=Spider-Noir+B%26W&type=show&tmdb_id=$SNID")
+check "annotated title + id returns artwork" \
+  "$([[ $S == 200 && $(jq_py annotated_id.json "d['total']") -gt 0 ]] && echo 1 || echo 0)" \
+  "id=$SNID status=$S total=$(jq_py annotated_id.json "d.get('total')")"
+
+# Requests without the parameter are unchanged, and echo null.
+check "query.tmdb_id is null when not supplied" \
+  "$(jq_py matrix.json "int(d['query']['tmdb_id'] is None)")" \
+  "$(jq_py matrix.json "repr(d['query'].get('tmdb_id'))")"
+
+# Validation.
+for BAD in abc 0 -1 "1.5"; do
+  S=$(get "badid.json" "q=The+Matrix&type=movie&tmdb_id=$BAD")
+  check "tmdb_id=$BAD is rejected" "$([[ $S == 400 ]] && echo 1 || echo 0)" "status=$S"
+done
+
+echo
 echo "=== 6.7 URLs resolve ==="
 python3 - "$WORK" <<'PY' > "$WORK/urls.txt"
 import json,sys
