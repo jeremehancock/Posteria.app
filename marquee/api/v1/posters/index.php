@@ -60,7 +60,11 @@ $includeTmdbArtwork = in_array('tmdb', $request['sources'], true);
 // --- Resolve ------------------------------------------------------------
 // The resolution is cached separately from the artwork so that a repeat search
 // skips the search call too, not just the artwork fan-out.
-$resolutionKey = 'resolve:' . $request['type'] . ':' . marqueeNormaliseTitle($request['q'])
+// Normalised for the type, so the two vocabularies for one collection — the
+// media server's "Star Wars" and the provider's "Star Wars Collection" — share a
+// single entry rather than each paying for its own search.
+$resolutionKey = 'resolve:' . $request['type'] . ':'
+    . marqueeNormaliseTitleForType($request['q'], $request['type'])
     . ':' . ($request['year'] ?? '');
 
 $resolution = marqueeStoreGet($resolutionKey);
@@ -75,12 +79,38 @@ if (!is_array($resolution)) {
         );
     }
 
-    $resolution = marqueeResolveWork($searchResponse['json'], $request['type'], $request['q'], $request['year']);
+    $resolutionDiagnostics = null;
+    $resolution = marqueeResolveWork(
+        $searchResponse['json'],
+        $request['type'],
+        $request['q'],
+        $request['year'],
+        $resolutionDiagnostics
+    );
 
     if ($resolution === null) {
+        // The failure path carries debug too. This is the case where it earns its
+        // keep: without the scores, "no match" cannot be told apart from "matched
+        // and scored below the floor", which is a question about this endpoint's
+        // configuration rather than about the query.
+        $extra = [];
+        if ($request['debug']) {
+            $extra['debug'] = [
+                'resolution' => $resolutionDiagnostics,
+                'calls' => [[
+                    'source' => SOURCE_LABELS['tmdb'],
+                    'call' => 'search',
+                    'status' => $searchResponse['status'],
+                    'error' => $searchResponse['error'],
+                    'timed_out' => $searchResponse['timed_out'],
+                ]],
+            ];
+        }
+
         marqueeSendFailure(
             'no_match',
-            'No ' . $request['type'] . ' matched "' . $request['q'] . '".'
+            'No ' . $request['type'] . ' matched "' . $request['q'] . '".',
+            $extra
         );
     }
 
@@ -158,9 +188,29 @@ if ($request['type'] === 'season') {
     // TMDB answers 404 for a season a show does not have. That is a resolution
     // failure, not an upstream failure.
     if (($seasonResponses['details']['status'] ?? 0) === 404) {
+        // The other no_match exit. It reports the show that did resolve rather
+        // than a candidate list, so the reader can see the season was asked for
+        // against the right work.
+        $extra = [];
+        if ($request['debug']) {
+            $extra['debug'] = [
+                'resolution' => [
+                    'winner' => [
+                        'tmdb_id' => $winner['tmdb_id'],
+                        'title' => $match['title'],
+                        'year' => $match['year'],
+                        'score' => $winner['score'] ?? $resolution['score'],
+                    ],
+                    'season_requested' => $request['season'],
+                ],
+                'calls' => $debugCalls,
+            ];
+        }
+
         marqueeSendFailure(
             'no_match',
-            'Season ' . $request['season'] . ' was not found for "' . $match['title'] . '".'
+            'Season ' . $request['season'] . ' was not found for "' . $match['title'] . '".',
+            $extra
         );
     }
 
@@ -254,7 +304,7 @@ if ($request['debug']) {
     $payload['debug'] = [
         'cache' => 'miss',
         'resolution' => [
-            'query_normalised' => marqueeNormaliseTitle($request['q']),
+            'query_normalised' => marqueeNormaliseTitleForType($request['q'], $request['type']),
             'winner' => [
                 'tmdb_id' => $winner['tmdb_id'],
                 'title' => $winner['title'],

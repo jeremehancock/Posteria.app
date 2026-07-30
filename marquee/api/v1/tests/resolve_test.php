@@ -58,6 +58,10 @@ $matrix = ['results' => [
     movie(999002, 'A Glitch in the Matrix', '2021-02-05', 9.0),
     movie(999003, 'The Living Matrix', '2009-01-01', 2.0),
     movie(999004, 'Exit the matrix', '2026-01-01', 0.5),
+    // Popularity deliberately above the 1999 film's. If the collection-suffix
+    // strip ever leaks into movie scoring, this ties at 60 and wins the
+    // tie-break, so the guard below fails loudly instead of passing by luck.
+    movie(999005, 'The Matrix Collection', '2018-01-01', 90.0),
 ]];
 
 $r = marqueeResolveWork($matrix, 'movie', 'The Matrix', 1999);
@@ -96,6 +100,38 @@ $sw = ['results' => [
 $r = marqueeResolveWork($sw, 'collection', 'Star Wars Collection', null);
 check('Star Wars Collection resolves to 10', $r['winner']['tmdb_id'], 10);
 
+// Plex names a collection "Star Wars"; TMDB names every collection record
+// "<Franchise> Collection". This is the vocabulary the client actually sends,
+// and the only vocabulary the original fixtures never covered.
+$r = marqueeResolveWork($sw, 'collection', 'Star Wars', null);
+check('Star Wars (no suffix) resolves to 10', $r['winner']['tmdb_id'] ?? null, 10);
+
+$r = marqueeResolveWork($sw, 'collection', 'star wars collection', null);
+check('Lowercase suffixed form resolves to 10', $r['winner']['tmdb_id'] ?? null, 10);
+
+// The year hint is inert for collections: marqueeCandidateFacts() carries no
+// date for the type, so this must resolve on title alone.
+$r = marqueeResolveWork($sw, 'collection', 'Star Wars', 1977);
+check('Star Wars + year still resolves to 10', $r['winner']['tmdb_id'] ?? null, 10);
+
+// The suffix is stripped from a trailing token only, so a franchise-prefixed
+// collection stays distinct rather than collapsing onto the bare franchise.
+$r = marqueeResolveWork($sw, 'collection', 'LEGO Star Wars', null);
+check('LEGO Star Wars resolves to its own collection', $r['winner']['tmdb_id'] ?? null, 999020);
+
+// --- Movie scoring must not loosen ----------------------------------------
+// The guard: a movie query must never be answered with a collection record or
+// a sequel, whatever the suffix handling does for collections.
+$r = marqueeResolveWork($matrix, 'movie', 'The Matrix', null);
+check('Matrix movie is not the collection record', $r['winner']['tmdb_id'], 603);
+
+$collection = ['results' => [
+    movie(105906, 'The Collection', '2012-11-30', 14.0),
+    movie(999040, 'The Collector', '2009-07-31', 11.0),
+]];
+$r = marqueeResolveWork($collection, 'movie', 'The Collection', null);
+check('A movie titled The Collection resolves', $r['winner']['tmdb_id'] ?? null, 105906);
+
 // --- No match -------------------------------------------------------------
 check('Empty results is a no-match', marqueeResolveWork(['results' => []], 'movie', 'Zzzznotarealtitle', null), null);
 
@@ -105,12 +141,85 @@ $junk = ['results' => [
 ]];
 check('Unrelated results fall below the floor', marqueeResolveWork($junk, 'movie', 'Zzzznotarealtitle', null), null);
 
+// A custom Plex collection has no upstream record at all. Still a no-match
+// after the suffix fix, and correctly so — there is nothing to resolve to.
+check(
+    'A custom collection with no record is a no-match',
+    marqueeResolveWork($sw, 'collection', 'Dad\'s Favourites', null),
+    null
+);
+
+// Stripping must not reduce a query to nothing and match everything.
+check(
+    'A bare "Collection" query matches nothing',
+    marqueeResolveWork($sw, 'collection', 'Collection', null),
+    null
+);
+
 // --- Normalisation --------------------------------------------------------
 check('Leading article dropped', marqueeNormaliseTitle('The Matrix'), 'matrix');
 check('Punctuation and case normalised', marqueeNormaliseTitle('WALL·E: The  Movie!'), 'wall e the movie');
 check('Diacritics folded', marqueeNormaliseTitle('Amélie'), 'amelie');
+
+// Type-aware normalisation: the collection suffix, and only that.
+check(
+    'Collection suffix stripped for collections',
+    marqueeNormaliseTitleForType('Star Wars Collection', 'collection'),
+    'star wars'
+);
+check(
+    'Unsuffixed collection is unchanged',
+    marqueeNormaliseTitleForType('Star Wars', 'collection'),
+    'star wars'
+);
+check(
+    'Collection suffix retained for movies',
+    marqueeNormaliseTitleForType('The Matrix Collection', 'movie'),
+    'matrix collection'
+);
+check(
+    'Collection suffix retained for shows',
+    marqueeNormaliseTitleForType('The Office Collection', 'show'),
+    'office collection'
+);
+check(
+    'Mid-string Collection is retained',
+    marqueeNormaliseTitleForType('The Criterion Collection Presents', 'collection'),
+    'criterion collection presents'
+);
+check(
+    'A bare Collection does not strip to empty',
+    marqueeNormaliseTitleForType('Collection', 'collection'),
+    'collection'
+);
+check(
+    'Trailing whitespace and case do not defeat the strip',
+    marqueeNormaliseTitleForType('  ALIEN   collection  ', 'collection'),
+    'alien'
+);
 $r = marqueeResolveWork($matrix, 'movie', 'the   MATRIX', null);
 check('Sloppy spelling resolves identically', $r['winner']['tmdb_id'], 603);
+
+// --- Rejection diagnostics ------------------------------------------------
+// The 404 is the case where the scores matter most: these two shapes are the
+// difference between "nothing upstream" and "the floor turned it down".
+$d = null;
+check('Below-floor rejection still returns null', marqueeResolveWork($junk, 'movie', 'Zzzznotarealtitle', null, $d), null);
+check('Rejection reports the normalised query', $d['query_normalised'], 'zzzznotarealtitle');
+check('Rejection reports the floor', $d['score_floor'], RESOLVE_SCORE_FLOOR);
+check('Rejection lists the candidates it scored', count($d['candidates']), 2);
+check('Top rejected candidate scored under the floor', $d['candidates'][0]['score'] < RESOLVE_SCORE_FLOOR, true);
+
+$d = null;
+check('Empty results is still a no-match', marqueeResolveWork(['results' => []], 'movie', 'Zzzznotarealtitle', null, $d), null);
+check('No upstream record means an empty candidate list', $d['candidates'], []);
+check('Empty results still reports the floor', $d['score_floor'], RESOLVE_SCORE_FLOOR);
+
+$d = null;
+$r = marqueeResolveWork($sw, 'collection', 'Star Wars', null, $d);
+check('Diagnostics normalise the query for the type', $d['query_normalised'], 'star wars');
+check('A resolved query reports its candidates too', $d['candidates'][0]['tmdb_id'], 10);
+check('Resolution is unaffected by collecting diagnostics', $r['winner']['tmdb_id'], 10);
 
 // --- Season identity ------------------------------------------------------
 $s = marqueeBuildSeasonIdentity(0, ['name' => 'Specials', 'air_date' => '2009-02-17', 'episodes' => [[], [], []]]);

@@ -35,6 +35,36 @@ function marqueeNormaliseTitle(string $title): string
     return trim($value);
 }
 
+/**
+ * Normalise for comparison against a candidate of a given type.
+ *
+ * TMDB names every collection record "<Franchise> Collection"; a media server
+ * names the same collection "<Franchise>". Making that token invisible on both
+ * sides lets the exact-title branch fire instead of the prefix branch, which is
+ * what keeps the score floor and the prefix weight where they are: sequels are
+ * prefix matches too and score in the same band as a suffixed collection, so no
+ * floor value admits one and excludes the other.
+ *
+ * Scoped deliberately:
+ * - collections only, because "The Collection" (2012) is a legitimate film title
+ * - trailing token only, so "The Criterion Collection Presents..." is not
+ *   mangled mid-string
+ */
+function marqueeNormaliseTitleForType(string $title, string $type): string
+{
+    $normalised = marqueeNormaliseTitle($title);
+
+    if ($type !== 'collection') {
+        return $normalised;
+    }
+
+    $stripped = preg_replace('/\s+collection$/', '', $normalised) ?? $normalised;
+
+    // A collection actually named "Collection" would otherwise normalise to an
+    // empty string, which compares against everything.
+    return $stripped === '' ? $normalised : $stripped;
+}
+
 /** Pull the comparable fields out of a TMDB search hit, whatever the type. */
 function marqueeCandidateFacts(array $result, string $type): array
 {
@@ -75,14 +105,18 @@ function marqueeCandidateFacts(array $result, string $type): array
  * only ever a tie-break. An exact title match scores far enough above the floor
  * that a wrong year hint cannot push it below — the year disambiguates between
  * candidates, it never disqualifies one.
+ *
+ * `$normalisedQuery` must already have been normalised for `$type` by
+ * marqueeNormaliseTitleForType(), so that both sides of every comparison here
+ * have had the same treatment applied.
  */
-function marqueeScoreCandidate(array $facts, string $normalisedQuery, ?int $year): float
+function marqueeScoreCandidate(array $facts, string $normalisedQuery, ?int $year, string $type): float
 {
     $score = 0.0;
 
     $best = 0.0;
     foreach ($facts['titles'] as $title) {
-        $normalised = marqueeNormaliseTitle($title);
+        $normalised = marqueeNormaliseTitleForType($title, $type);
         if ($normalised === '') {
             continue;
         }
@@ -126,13 +160,45 @@ function marqueeScoreCandidate(array $facts, string $normalisedQuery, ?int $year
     return $score;
 }
 
+/** The reportable summary of one scored candidate. */
+function marqueeCandidateSummary(array $candidate): array
+{
+    return [
+        'tmdb_id' => $candidate['tmdb_id'],
+        'title' => $candidate['title'],
+        'year' => $candidate['year'],
+        'score' => $candidate['score'],
+    ];
+}
+
 /**
  * Pick one work, or nothing.
  *
+ * `$diagnostics` reports how the decision was reached whether or not one was
+ * made, because a rejection is the case worth explaining: an empty `candidates`
+ * means the provider had no record of the query, while a populated one whose top
+ * score is under `score_floor` means the provider found the work and the floor
+ * turned it down. It is an out-parameter rather than part of the return value so
+ * that the "one work or nothing" contract, and every caller's null check, stand.
+ *
+ * @param array|null $diagnostics out: query_normalised, score_floor, candidates
  * @return array{winner: array, score: float, rejected: array}|null
  */
-function marqueeResolveWork(array $searchPayload, string $type, string $query, ?int $year): ?array
-{
+function marqueeResolveWork(
+    array $searchPayload,
+    string $type,
+    string $query,
+    ?int $year,
+    ?array &$diagnostics = null
+): ?array {
+    $normalisedQuery = marqueeNormaliseTitleForType($query, $type);
+
+    $diagnostics = [
+        'query_normalised' => $normalisedQuery,
+        'score_floor' => RESOLVE_SCORE_FLOOR,
+        'candidates' => [],
+    ];
+
     $results = is_array($searchPayload) && isset($searchPayload['results']) && is_array($searchPayload['results'])
         ? $searchPayload['results']
         : [];
@@ -141,7 +207,6 @@ function marqueeResolveWork(array $searchPayload, string $type, string $query, ?
         return null;
     }
 
-    $normalisedQuery = marqueeNormaliseTitle($query);
     $scored = [];
 
     foreach ($results as $result) {
@@ -152,7 +217,7 @@ function marqueeResolveWork(array $searchPayload, string $type, string $query, ?
         if ($facts['tmdb_id'] === null || $facts['titles'] === []) {
             continue;
         }
-        $facts['score'] = round(marqueeScoreCandidate($facts, $normalisedQuery, $year), 3);
+        $facts['score'] = round(marqueeScoreCandidate($facts, $normalisedQuery, $year, $type), 3);
         $scored[] = $facts;
     }
 
@@ -166,20 +231,16 @@ function marqueeResolveWork(array $searchPayload, string $type, string $query, ?
             ?: $a['tmdb_id'] <=> $b['tmdb_id'];
     });
 
+    // Capped like the winner's `rejected` list below. Top-first, so the
+    // near-miss that explains a rejection is always the first entry.
+    $diagnostics['candidates'] = array_map('marqueeCandidateSummary', array_slice($scored, 0, 10));
+
     $winner = $scored[0];
     if ($winner['score'] < RESOLVE_SCORE_FLOOR) {
         return null;
     }
 
-    $rejected = [];
-    foreach (array_slice($scored, 1, 10) as $candidate) {
-        $rejected[] = [
-            'tmdb_id' => $candidate['tmdb_id'],
-            'title' => $candidate['title'],
-            'year' => $candidate['year'],
-            'score' => $candidate['score'],
-        ];
-    }
+    $rejected = array_map('marqueeCandidateSummary', array_slice($scored, 1, 10));
 
     return ['winner' => $winner, 'score' => $winner['score'], 'rejected' => $rejected];
 }

@@ -134,12 +134,62 @@ check "resolves to TMDB collection 10" "$([[ $(jq_py sw.json "d['match']['tmdb_i
   "$(jq_py sw.json "repr(d['match']['title'])")"
 check "no duplicate urls" "$(jq_py sw.json "int(len({p['url'] for p in d['posters']})==len(d['posters']))")"
 
+# A media server names this collection "Star Wars"; TMDB names it "Star Wars
+# Collection". The checks above probed only the provider's vocabulary, which is
+# how a total failure of the client's vocabulary shipped unnoticed. These probe
+# what the client actually sends.
+get sw_bare.json "q=Star+Wars&type=collection" >/dev/null
+check "unsuffixed 'Star Wars' resolves to collection 10" \
+  "$([[ $(jq_py sw_bare.json "d['match']['tmdb_id']") == 10 ]] && echo 1 || echo 0)" \
+  "$(jq_py sw_bare.json "repr(d.get('match',{}).get('title'))")"
+check "unsuffixed 'Star Wars' returns art" \
+  "$(jq_py sw_bare.json "int(d.get('total',0)>0)")" "total=$(jq_py sw_bare.json "d.get('total')")"
+
+# Both vocabularies must land on the one record.
+check "suffixed and unsuffixed agree on the record" \
+  "$([[ $(jq_py sw.json "d['match']['tmdb_id']") == $(jq_py sw_bare.json "d['match']['tmdb_id']") ]] && echo 1 || echo 0)" \
+  "suffixed=$(jq_py sw.json "d['match']['tmdb_id']") bare=$(jq_py sw_bare.json "d['match']['tmdb_id']")"
+
+# Asserted on the resolved title rather than a hardcoded id: these ids are not
+# established anywhere else in this suite, and the defect shows up as a 404 in
+# any case, which a title check catches just as well.
+for Q in "Alien" "Harry+Potter"; do
+  F="coll_$(echo "$Q" | tr -cd '[:alnum:]').json"
+  S=$(get "$F" "q=$Q&type=collection")
+  check "unsuffixed '$Q' resolves" "$([[ $S == 200 ]] && echo 1 || echo 0)" \
+    "status=$S $(jq_py "$F" "repr(d.get('match',{}).get('title'))")"
+  check "unsuffixed '$Q' resolved to a matching title" \
+    "$(jq_py "$F" "int('$(echo "$Q" | tr '+' ' ')'.lower() in d['match']['title'].lower())")" \
+    "$(jq_py "$F" "repr(d.get('match',{}).get('title'))")"
+  check "unsuffixed '$Q' returns art" \
+    "$(jq_py "$F" "int(d.get('total',0)>0)")" "total=$(jq_py "$F" "d.get('total')")"
+done
+
 echo
 echo "=== 6.6 No match ==="
 S=$(get nomatch.json "q=Zzzznotarealtitle&type=movie")
 check "404 for an unknown title" "$([[ $S == 404 ]] && echo 1 || echo 0)" "status=$S"
 check "code is no_match" "$([[ $(jq_py nomatch.json "d['code']") == no_match ]] && echo 1 || echo 0)" \
   "$(jq_py nomatch.json "repr(d.get('code'))")"
+
+# A custom collection has no upstream record. Still a 404, and the debug block on
+# the failure is what distinguishes that from a below-floor rejection.
+S=$(get custom_coll.json "q=Christmas+Movies&type=collection&debug=true")
+check "custom collection still 404s" "$([[ $S == 404 ]] && echo 1 || echo 0)" "status=$S"
+check "404 carries a debug block" "$(jq_py custom_coll.json "int('debug' in d)")"
+check "404 debug reports the floor" \
+  "$(jq_py custom_coll.json "int(d['debug']['resolution']['score_floor']>0)")" \
+  "floor=$(jq_py custom_coll.json "d['debug']['resolution'].get('score_floor')")"
+check "404 debug reports the normalised query" \
+  "$(jq_py custom_coll.json "int(d['debug']['resolution']['query_normalised']=='christmas movies')")" \
+  "$(jq_py custom_coll.json "repr(d['debug']['resolution'].get('query_normalised'))")"
+check "404 debug lists what was scored" \
+  "$(jq_py custom_coll.json "int(isinstance(d['debug']['resolution']['candidates'], list))")" \
+  "candidates=$(jq_py custom_coll.json "len(d['debug']['resolution']['candidates'])")"
+check "404 keeps its code alongside debug" \
+  "$([[ $(jq_py custom_coll.json "d['code']") == no_match ]] && echo 1 || echo 0)"
+check "no debug key on a 404 when not requested" \
+  "$(jq_py nomatch.json "int('debug' not in d)")"
 
 echo
 echo "=== 6.7 URLs resolve ==="
