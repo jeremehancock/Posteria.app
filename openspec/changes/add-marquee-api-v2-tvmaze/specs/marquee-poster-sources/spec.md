@@ -185,28 +185,63 @@ For `type=season` the system SHALL return only the requested season's own image.
 - **WHEN** a `type=season` request resolves a season TVmaze holds no image for
 - **THEN** TVmaze is reported as `no_data` and no show-level TVmaze poster is substituted
 
-### Requirement: Source attribution obligations are satisfiable from the response
+### Requirement: Every poster links back to its source
 
-Where a source's licence requires a link back to it, every poster that source supplies SHALL carry an absolute URL to that source's page for the work, so that a client can comply without knowledge held outside the response.
+Each poster SHALL carry an absolute URL to the supplying source's page for the work, wherever that URL can be determined without guesswork, so that a user can see the artwork in its original context and a client can credit the source it came from.
 
-TVmaze artwork is licensed CC BY-SA and SHALL carry such a link: the show's page for a `type=show` poster, and the requested season's own page for a `type=season` poster.
+That URL SHALL be derived only from identifiers the system already holds or from values the source itself supplied. It SHALL NOT be derived from the work's title, by slug or by any other string transformation. A source whose page cannot be addressed without such a transformation SHALL omit the link rather than carry a guessed one.
+
+The link SHALL address the most specific page the source genuinely serves: for a `type=season` request, the season's own page where the source publishes one, and the work's page otherwise. A path segment the source accepts but ignores SHALL NOT be treated as a more specific page.
 
 The system SHALL identify itself to upstream providers with a stable, descriptive user agent.
 
-#### Scenario: Show poster carries its source page
+#### Scenario: Every source supplies its link
 
-- **WHEN** a `type=show` response contains a poster whose `source` is `tvmaze`
-- **THEN** that poster carries an absolute URL to the show's TVmaze page
+- **WHEN** a `type=show` request succeeds with artwork from TMDB, fanart.tv, TheTVDB and TVmaze
+- **THEN** every returned poster carries an absolute URL to its own source's page for that show
 
-#### Scenario: Season poster links to the season, not the show
+#### Scenario: Link is built from identifiers, not titles
 
-- **WHEN** a `type=season` response contains a poster whose `source` is `tvmaze`
-- **THEN** that poster carries an absolute URL to that season's own TVmaze page, which differs from the show's page
+- **WHEN** a poster's source page is addressed by an identifier the system already holds
+- **THEN** the system builds the link from that identifier and performs no additional upstream call to obtain it
 
-#### Scenario: Source with no attribution obligation
+#### Scenario: Title-derived addressing is refused
+
+- **WHEN** a source's page can only be addressed by a slug derived from the work's title
+- **THEN** the system omits the link for that source rather than constructing the slug
+
+#### Scenario: Season poster links to the season
+
+- **WHEN** a `type=season` response contains a poster from a source that publishes a season page
+- **THEN** that poster's link addresses the season, and differs from the link the same source carries on a `type=show` response
+
+#### Scenario: Season poster falls back to the work
+
+- **WHEN** a `type=season` response contains a poster from a source that publishes no season page
+- **THEN** that poster's link addresses the work rather than a season path the source would ignore
+
+### Requirement: Licence-required attribution is marked
+
+A poster whose source licence *requires* a link back SHALL be marked as such, distinctly from a poster carrying a link offered only as provenance. The mark SHALL be present only where the obligation is real, and absent otherwise rather than present and false.
+
+TVmaze artwork is licensed CC BY-SA and SHALL be marked. TMDB, fanart.tv and TheTVDB impose no comparable term on artwork obtained through their APIs and SHALL NOT be marked.
+
+A client SHALL therefore be able to determine, from the response alone, which links it is obliged to render and which it may present at its discretion.
+
+#### Scenario: Licence-required poster is marked
+
+- **WHEN** a response contains a poster whose `source` is `tvmaze`
+- **THEN** that poster carries both the link and the mark identifying the link as licence-required
+
+#### Scenario: Courtesy link is not marked
 
 - **WHEN** a response contains a poster supplied by TMDB, fanart.tv or TheTVDB
-- **THEN** that poster carries no source page URL, rather than a guessed or empty one
+- **THEN** that poster carries the link and omits the mark entirely, rather than carrying it set to false
+
+#### Scenario: Obligation is discoverable without knowing the sources
+
+- **WHEN** a client that has no built-in knowledge of any provider renders a response
+- **THEN** it can identify every link it must render by the mark alone
 
 ### Requirement: The previous endpoint version is frozen
 

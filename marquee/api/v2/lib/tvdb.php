@@ -121,6 +121,34 @@ function marqueeTvdbLanguage(?string $code): ?string
 }
 
 /**
+ * The TheTVDB page for a work, built from the slug the API already returned.
+ *
+ * The slug is not derived from the title — it arrives in the payloads this client
+ * already fetches: the series artworks response, the movie extended record, and the
+ * series extended record used to locate a season. Without it there is no link.
+ *
+ * Season pages are real: /series/{slug}/seasons/official/2 differs from the series
+ * page and 404s for a season the show does not have. The per-artwork path is not
+ * used — /artwork/{id} renders the same bytes for a real id, a fabricated id and no
+ * id at all, so it looks specific without being so.
+ */
+function marqueeTvdbPage(?string $slug, string $type, ?int $season): ?string
+{
+    if ($slug === null || $slug === '') {
+        return null;
+    }
+
+    if ($type === 'movie') {
+        return TVDB_WEB_BASE_URL . '/movies/' . $slug;
+    }
+    if ($type === 'season' && $season !== null) {
+        return TVDB_WEB_BASE_URL . '/series/' . $slug . '/seasons/official/' . $season;
+    }
+
+    return TVDB_WEB_BASE_URL . '/series/' . $slug;
+}
+
+/**
  * Map TheTVDB artwork entries of one type to poster objects.
  *
  * TheTVDB's `score` runs in the hundred-thousands and is not comparable to TMDB's
@@ -128,7 +156,7 @@ function marqueeTvdbLanguage(?string $code): ?string
  * every TMDB one regardless of quality, so it is omitted — the same reasoning that
  * omits fanart's like count.
  */
-function marqueeTvdbPosters($artworks, int $wantedType): array
+function marqueeTvdbPosters($artworks, int $wantedType, ?string $page = null): array
 {
     if (!is_array($artworks)) {
         return [];
@@ -162,6 +190,10 @@ function marqueeTvdbPosters($artworks, int $wantedType): array
         }
         if (isset($artwork['height']) && is_numeric($artwork['height'])) {
             $poster['height'] = (int) $artwork['height'];
+        }
+
+        if ($page !== null) {
+            $poster['page'] = $page;
         }
 
         $posters[] = $poster;

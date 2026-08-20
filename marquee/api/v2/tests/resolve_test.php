@@ -431,6 +431,70 @@ check('tvmaze does not handle movies', marqueeSourceHandlesType('tvmaze', 'movie
 check('tvmaze does not handle collections', marqueeSourceHandlesType('tvmaze', 'collection'), false);
 check('other sources handle every type', marqueeSourceHandlesType('fanart', 'movie'), true);
 
+// --- Source page links ----------------------------------------------------
+// Every source carries `page`, built only from identifiers already held or values
+// the source itself supplied. Nothing here is derived from a title.
+
+check('tmdb movie page', marqueeTmdbPage('movie', 603, null), 'https://www.themoviedb.org/movie/603');
+check('tmdb show page', marqueeTmdbPage('show', 1396, null), 'https://www.themoviedb.org/tv/1396');
+check('tmdb season page', marqueeTmdbPage('season', 1396, 2), 'https://www.themoviedb.org/tv/1396/season/2');
+check('tmdb specials page', marqueeTmdbPage('season', 1396, 0), 'https://www.themoviedb.org/tv/1396/season/0');
+check('tmdb collection page', marqueeTmdbPage('collection', 10, null), 'https://www.themoviedb.org/collection/10');
+check('tmdb page needs an id', marqueeTmdbPage('movie', null, null), null);
+
+// fanart is keyed on exactly the ids used to fetch its artwork, so the link cannot
+// rot independently of the data.
+check('fanart movie page uses the tmdb id', marqueeFanartPage('movie', 11974, null), 'https://fanart.tv/movie/11974/');
+check('fanart show page uses the tvdb id', marqueeFanartPage('show', 2710, 75805), 'https://fanart.tv/series/75805/');
+check('fanart season page is the series page', marqueeFanartPage('season', 1396, 81189), 'https://fanart.tv/series/81189/');
+check('fanart movie page needs a tmdb id', marqueeFanartPage('movie', null, 81189), null);
+check('fanart tv page needs a tvdb id', marqueeFanartPage('show', 1396, null), null);
+check('fanart has no collection page', marqueeFanartPage('collection', 10, null), null);
+
+// TheTVDB's slug arrives in payloads already fetched; without it there is no link.
+check('tvdb movie page', marqueeTvdbPage('the-matrix', 'movie', null), 'https://thetvdb.com/movies/the-matrix');
+check('tvdb show page', marqueeTvdbPage('breaking-bad', 'show', null), 'https://thetvdb.com/series/breaking-bad');
+check('tvdb season page', marqueeTvdbPage('breaking-bad', 'season', 2),
+    'https://thetvdb.com/series/breaking-bad/seasons/official/2');
+check('tvdb specials page', marqueeTvdbPage('breaking-bad', 'season', 0),
+    'https://thetvdb.com/series/breaking-bad/seasons/official/0');
+check('tvdb page needs a slug', marqueeTvdbPage(null, 'show', null), null);
+check('tvdb page rejects an empty slug', marqueeTvdbPage('', 'show', null), null);
+
+// Threading: each mapper attaches the page it is handed, and omits it when handed none.
+check('tmdb poster carries page',
+    marqueeTmdbPosters(['posters' => [['file_path' => '/a.jpg']]], 'https://p/1')[0]['page'], 'https://p/1');
+check('tmdb poster omits page when none',
+    array_key_exists('page', marqueeTmdbPosters(['posters' => [['file_path' => '/a.jpg']]])[0]), false);
+check('tvdb poster carries page',
+    marqueeTvdbPosters([['image' => 'https://a/p.jpg', 'type' => 14]], 14, 'https://p/2')[0]['page'], 'https://p/2');
+check('tvdb poster omits page when none',
+    array_key_exists('page', marqueeTvdbPosters([['image' => 'https://a/p.jpg', 'type' => 14]], 14)[0]), false);
+check('fanart poster carries page',
+    marqueeMapFanartPosters(['movieposter' => [['url' => 'https://f/a.jpg']]], 'movie', null, 'https://p/3')[0]['page'],
+    'https://p/3');
+check('fanart poster omits page when none',
+    array_key_exists('page', marqueeMapFanartPosters(['movieposter' => [['url' => 'https://f/a.jpg']]], 'movie', null)[0]),
+    false);
+
+// --- Attribution marker ---------------------------------------------------
+// Only TVmaze's link is a licence term. The marker is absent, not false, elsewhere —
+// a client keys its obligation on presence.
+$tvmMarked = marqueeTvmazePosters($images, 'https://www.tvmaze.com/shows/169/breaking-bad');
+check('tvmaze poster is marked', $tvmMarked[0]['attribution_required'], true);
+check('tvmaze season poster is marked', marqueeTvmazeSeasonPosters($seasons, 2)[0]['attribution_required'], true);
+check('unmarked when tvmaze has no page',
+    array_key_exists('attribution_required', marqueeTvmazePosters($images, null)[0]), false);
+check('tmdb is not marked',
+    array_key_exists('attribution_required', marqueeTmdbPosters(['posters' => [['file_path' => '/a.jpg']]], 'https://p/1')[0]),
+    false);
+check('tvdb is not marked',
+    array_key_exists('attribution_required', marqueeTvdbPosters([['image' => 'https://a/p.jpg', 'type' => 14]], 14, 'https://p/2')[0]),
+    false);
+check('fanart is not marked',
+    array_key_exists('attribution_required', marqueeMapFanartPosters(['movieposter' => [['url' => 'https://f/a.jpg']]], 'movie', null, 'https://p/3')[0]),
+    false);
+
 // --- Provider verdicts ----------------------------------------------------
 check('all ok is not partial',
     marqueeSummariseProviders(['tmdb' => 'ok', 'fanart.tv' => 'ok']), 'ok');

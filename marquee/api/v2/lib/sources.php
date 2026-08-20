@@ -59,6 +59,7 @@ function marqueeGatherExternalPosters(array $ctx): array
 
     // --- fanart.tv -------------------------------------------------------
     $fanartLabel = SOURCE_LABELS['fanart'];
+    $fanartPage = marqueeFanartPage($ctx['type'], $ctx['tmdb_id'], $ctx['tvdb_id']);
     if (!in_array('fanart', $selected, true)) {
         $providers[$fanartLabel] = OUTCOME_SKIPPED;
     } elseif ($credentials['fanart'] === null) {
@@ -86,6 +87,10 @@ function marqueeGatherExternalPosters(array $ctx): array
     $tvdbLabel = SOURCE_LABELS['tvdb'];
     $tvdbToken = null;
     $tvdbStage = null;
+    // The slug arrives free in payloads this client already fetches. Captured here
+    // rather than derived from the title, which is what the whole client exists to
+    // avoid.
+    $tvdbSlug = null;
 
     if (!in_array('tvdb', $selected, true)) {
         $providers[$tvdbLabel] = OUTCOME_SKIPPED;
@@ -220,7 +225,7 @@ function marqueeGatherExternalPosters(array $ctx): array
         }
 
         if ($key === 'fanart') {
-            $found = marqueeMapFanartPosters($response['json'], $ctx['type'], $ctx['season']);
+            $found = marqueeMapFanartPosters($response['json'], $ctx['type'], $ctx['season'], $fanartPage);
             $providers[$label] = $found === [] ? OUTCOME_NO_DATA : OUTCOME_OK;
             $posters = array_merge($posters, $found);
             continue;
@@ -247,7 +252,12 @@ function marqueeGatherExternalPosters(array $ctx): array
         // TheTVDB: either this response was the artwork itself, or it tells us
         // which record to ask for artwork next.
         if ($tvdbStage === 'artwork_series') {
-            $found = marqueeTvdbPosters($response['json']['data']['artworks'] ?? null, TVDB_ARTWORK_TYPE_SERIES_POSTER);
+            $tvdbSlug = $response['json']['data']['slug'] ?? null;
+            $found = marqueeTvdbPosters(
+                $response['json']['data']['artworks'] ?? null,
+                TVDB_ARTWORK_TYPE_SERIES_POSTER,
+                marqueeTvdbPage(is_string($tvdbSlug) ? $tvdbSlug : null, $ctx['type'], $ctx['season'])
+            );
             $providers[$label] = $found === [] ? OUTCOME_NO_DATA : OUTCOME_OK;
             $posters = array_merge($posters, $found);
             continue;
@@ -260,6 +270,8 @@ function marqueeGatherExternalPosters(array $ctx): array
                 'url' => TVDB_BASE_URL . '/movies/' . $movieId . '/extended',
             ];
         } else {
+            $slug = $response['json']['data']['slug'] ?? null;
+            $tvdbSlug = is_string($slug) ? $slug : null;
             $seasonId = marqueeTvdbSeasonId($response['json'], $ctx['season']);
             $tvdbSecond = $seasonId === null ? null : [
                 'stage' => 'artwork_season',
@@ -324,9 +336,16 @@ function marqueeGatherExternalPosters(array $ctx): array
 
         if ($key === 'tvdb') {
             $isMovie = $stage === 'artwork_movie';
+            // A movie's slug is on its own extended record; a season's comes from the
+            // series record fetched in round one.
+            if ($isMovie) {
+                $slug = $response['json']['data']['slug'] ?? null;
+                $tvdbSlug = is_string($slug) ? $slug : null;
+            }
             $found = marqueeTvdbPosters(
                 $response['json']['data']['artworks'] ?? $response['json']['data']['artwork'] ?? null,
-                $isMovie ? TVDB_ARTWORK_TYPE_MOVIE_POSTER : TVDB_ARTWORK_TYPE_SEASON_POSTER
+                $isMovie ? TVDB_ARTWORK_TYPE_MOVIE_POSTER : TVDB_ARTWORK_TYPE_SEASON_POSTER,
+                marqueeTvdbPage($tvdbSlug, $ctx['type'], $ctx['season'])
             );
         } elseif ($stage === 'seasons') {
             $found = marqueeTvmazeSeasonPosters($response['json'], $ctx['season']);
@@ -395,7 +414,36 @@ function marqueeSummariseProviders(array $providers): string
  * is always attributed to fanart.tv rather than to whichever source supplied the
  * work's metadata.
  */
-function marqueeMapFanartPosters(?array $payload, string $type, ?int $season): array
+/**
+ * The fanart.tv page for a work.
+ *
+ * Keyed on exactly the two identifiers already used to fetch fanart's artwork — the
+ * TMDB id for films, the TVDB id for television — so the link cannot rot
+ * independently of the data: if the id were wrong, the artwork would be wrong too.
+ *
+ * fanart's canonical URL carries a title slug after the id, but the id alone
+ * resolves, and the slug is not constructed. Deriving it is unreliable (fanart writes
+ * "It's Always Sunny" as `its-...`, a naive slugifier as `it-s-...`, and accented
+ * titles diverge further) and would be the title-derived addressing the provenance
+ * rules forbid. The only cost is the `?section=poster` deep link, which the id-only
+ * form does not accept.
+ */
+function marqueeFanartPage(string $type, ?int $tmdbId, ?int $tvdbId): ?string
+{
+    if ($type === 'movie') {
+        return $tmdbId === null ? null : FANART_WEB_BASE_URL . '/movie/' . $tmdbId . '/';
+    }
+
+    if ($type === 'show' || $type === 'season') {
+        return $tvdbId === null ? null : FANART_WEB_BASE_URL . '/series/' . $tvdbId . '/';
+    }
+
+    // fanart has no collection endpoint, so a collection never has fanart artwork
+    // to attach a link to.
+    return null;
+}
+
+function marqueeMapFanartPosters(?array $payload, string $type, ?int $season, ?string $page = null): array
 {
     if (!is_array($payload)) {
         return [];
@@ -436,6 +484,10 @@ function marqueeMapFanartPosters(?array $payload, string $type, ?int $season): a
         // fanart uses "00" for language-neutral artwork.
         if (!empty($entry['lang']) && is_string($entry['lang']) && $entry['lang'] !== '00') {
             $poster['language'] = $entry['lang'];
+        }
+
+        if ($page !== null) {
+            $poster['page'] = $page;
         }
 
         // fanart supplies a like count, not a rating comparable to TMDB's

@@ -427,9 +427,11 @@ check "every tvmaze poster carries page" \
   "without page=$(jq_py tvm_show.json "sum(1 for p in d['posters'] if p['source']=='tvmaze' and 'page' not in p)")"
 check "tvmaze page points at tvmaze.com" \
   "$(jq_py tvm_show.json "int(all('tvmaze.com' in p['page'] for p in d['posters'] if p['source']=='tvmaze'))")"
-check "no other source carries page" \
-  "$(jq_py tvm_show.json "int(not any('page' in p for p in d['posters'] if p['source']!='tvmaze'))")" \
-  "$(jq_py tvm_show.json "sorted({p['source'] for p in d['posters'] if 'page' in p})")"
+# `page` is universal — every source carries one. What is unique to TVmaze is the
+# licence obligation, which rides on `attribution_required`, not on the link.
+check "tvmaze is the only marked source" \
+  "$(jq_py tvm_show.json "int({p['source'] for p in d['posters'] if p.get('attribution_required')} == {'tvmaze'})")" \
+  "marked=$(jq_py tvm_show.json "sorted({p['source'] for p in d['posters'] if p.get('attribution_required')})")"
 # main is a designation, not a rating; carrying it as a score would put every
 # tvmaze poster above every rated one. Same reasoning as fanart's like count.
 check "tvmaze carries no score or language" \
@@ -516,6 +518,81 @@ C=$(curl -s -o /dev/null -w '%{http_code}' -I --max-time 15 "$TVURL")
 check "tvmaze image resolves" "$([[ $C == 200 ]] && echo 1 || echo 0)" "$C  ${TVURL:0:70}"
 
 echo
+echo "=== source links (v2) ==="
+# Every source carries `page`, built only from ids already held or values the source
+# supplied. None is derived from a title.
+rm -rf "${TMPDIR:-/tmp}/marquee-api-v2"
+get pg_show.json "q=Breaking+Bad&type=show" >/dev/null
+get pg_movie.json "q=The+Matrix&type=movie&year=1999" >/dev/null
+get pg_season.json "q=Breaking+Bad&type=season&season=2" >/dev/null
+get pg_coll.json "q=Star+Wars+Collection&type=collection" >/dev/null
+
+for F in pg_show pg_movie pg_season pg_coll; do
+  check "$F: every poster carries page" \
+    "$(jq_py $F.json "int(all('page' in p for p in d['posters']))")" \
+    "without=$(jq_py $F.json "sorted({p['source'] for p in d['posters'] if 'page' not in p})")"
+  check "$F: page is absolute http(s)" \
+    "$(jq_py $F.json "int(all(p.get('page','').startswith('http') for p in d['posters']))")"
+  check "$F: page host matches its source" \
+    "$(jq_py $F.json "int(all({'tmdb':'themoviedb.org','fanart.tv':'fanart.tv','thetvdb':'thetvdb.com','tvmaze':'tvmaze.com'}[p['source']] in p['page'] for p in d['posters']))")" \
+    "$(jq_py $F.json "sorted({(p['source'], p['page'].split('/')[2]) for p in d['posters']})")"
+done
+
+# Season links must address the season where the source publishes one.
+check "tmdb season link addresses the season" \
+  "$(jq_py pg_season.json "int(all('/season/2' in p['page'] for p in d['posters'] if p['source']=='tmdb'))")" \
+  "$(jq_py pg_season.json "sorted({p['page'] for p in d['posters'] if p['source']=='tmdb'})")"
+check "thetvdb season link addresses the season" \
+  "$(jq_py pg_season.json "int(all('/seasons/official/2' in p['page'] for p in d['posters'] if p['source']=='thetvdb'))")" \
+  "$(jq_py pg_season.json "sorted({p['page'] for p in d['posters'] if p['source']=='thetvdb'})")"
+check "season links differ from show links" \
+  "$(python3 -c "
+import json
+s=json.load(open('$WORK/pg_season.json'))['posters']; h=json.load(open('$WORK/pg_show.json'))['posters']
+for src in ('tmdb','thetvdb','tvmaze'):
+    a={p['page'] for p in s if p['source']==src}; b={p['page'] for p in h if p['source']==src}
+    if a and b and (a & b): print(0); raise SystemExit
+print(1)" 2>/dev/null || echo 0)"
+# fanart publishes no season page, so it correctly falls back to the series page.
+check "fanart season link falls back to the series page" \
+  "$(jq_py pg_season.json "int(all('/series/' in p['page'] for p in d['posters'] if p['source']=='fanart.tv'))")" \
+  "$(jq_py pg_season.json "sorted({p['page'] for p in d['posters'] if p['source']=='fanart.tv'})")"
+
+# The marker: only TVmaze's link is a licence term.
+check "only tvmaze is marked attribution_required" \
+  "$(jq_py pg_show.json "int({p['source'] for p in d['posters'] if p.get('attribution_required')} == {'tvmaze'})")" \
+  "$(jq_py pg_show.json "sorted({p['source'] for p in d['posters'] if p.get('attribution_required')})")"
+check "every tvmaze poster is marked" \
+  "$(jq_py pg_show.json "int(all(p.get('attribution_required') is True for p in d['posters'] if p['source']=='tvmaze'))")"
+check "marker is absent, not false, elsewhere" \
+  "$(jq_py pg_show.json "int(not any('attribution_required' in p for p in d['posters'] if p['source']!='tvmaze'))")"
+check "season posters marked the same way" \
+  "$(jq_py pg_season.json "int({p['source'] for p in d['posters'] if p.get('attribution_required')} <= {'tvmaze'})")"
+
+# Links must actually resolve. One per source per type, deduplicated.
+python3 - "$WORK" <<'PY' > "$WORK/pages.txt"
+import json,sys
+seen=set(); out=[]
+for f in ('pg_show','pg_movie','pg_season','pg_coll'):
+    for p in json.load(open(f'{sys.argv[1]}/{f}.json'))['posters']:
+        k=(p['source'], p['page'])
+        if k not in seen:
+            seen.add(k); out.append(f"{p['source']}\t{p['page']}")
+print('\n'.join(out))
+PY
+while IFS=$'\t' read -r src url; do
+  [[ -z $url ]] && continue
+  # fanart.tv sits behind a bot challenge; a 403 there is the WAF, not a bad link.
+  C=$(curl -s -o /dev/null -w '%{http_code}' -L --max-time 20 \
+      -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" "$url")
+  if [[ $src == "fanart.tv" && $C == 403 ]]; then
+    check "page resolves ($src)" 1 "$C bot-challenge, link form unverifiable here  ${url:0:56}"
+  else
+    check "page resolves ($src)" "$([[ $C == 200 ]] && echo 1 || echo 0)" "$C  ${url:0:60}"
+  fi
+done < "$WORK/pages.txt"
+
+echo
 echo "=== v1 is unaffected ==="
 # The frozen version must not have acquired the new source or the new field. The
 # artwork cache key is identical between versions for a given work and sources
@@ -527,6 +604,8 @@ check "v1 providers carry no tvmaze key" \
   "$(jq_py v1_show.json "d['providers']")"
 check "v1 posters carry no page field" \
   "$(jq_py v1_show.json "int(not any('page' in p for p in d['posters']))")"
+check "v1 posters carry no attribution_required" \
+  "$(jq_py v1_show.json "int(not any('attribution_required' in p for p in d['posters']))")"
 check "v1 returns no tvmaze art" \
   "$(jq_py v1_show.json "int(not any(p['source']=='tvmaze' for p in d['posters']))")" \
   "$(jq_py v1_show.json "sorted({p['source'] for p in d['posters']})")"

@@ -139,7 +139,33 @@ function marqueeTmdbSeason(int $showId, int $seasonNumber, string $apiKey): arra
  * is omitted rather than guessed — an unrated image carries no `score` at all, so
  * it sorts below rated ones instead of tying with a genuine zero.
  */
-function marqueeTmdbPosters(?array $imagesPayload): array
+/**
+ * The TMDB page for a work, built from the id already resolved.
+ *
+ * No extra call and no title involved: the id came from TMDB, so the link cannot
+ * disagree with the artwork it accompanies. Season pages are real pages rather than
+ * an ignored path segment — /tv/1396/season/2 differs from /tv/1396.
+ */
+function marqueeTmdbPage(string $type, ?int $tmdbId, ?int $season): ?string
+{
+    if ($tmdbId === null) {
+        return null;
+    }
+
+    if ($type === 'movie') {
+        return TMDB_WEB_BASE_URL . '/movie/' . $tmdbId;
+    }
+    if ($type === 'collection') {
+        return TMDB_WEB_BASE_URL . '/collection/' . $tmdbId;
+    }
+    if ($type === 'season' && $season !== null) {
+        return TMDB_WEB_BASE_URL . '/tv/' . $tmdbId . '/season/' . $season;
+    }
+
+    return TMDB_WEB_BASE_URL . '/tv/' . $tmdbId;
+}
+
+function marqueeTmdbPosters(?array $imagesPayload, ?string $page = null): array
 {
     if (!is_array($imagesPayload) || !isset($imagesPayload['posters']) || !is_array($imagesPayload['posters'])) {
         return [];
@@ -169,6 +195,10 @@ function marqueeTmdbPosters(?array $imagesPayload): array
         if (isset($image['vote_average'], $image['vote_count'])
             && is_numeric($image['vote_average']) && (int) $image['vote_count'] > 0) {
             $poster['score'] = round((float) $image['vote_average'], 3);
+        }
+
+        if ($page !== null) {
+            $poster['page'] = $page;
         }
 
         $posters[] = $poster;

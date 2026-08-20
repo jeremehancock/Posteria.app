@@ -29,7 +29,7 @@
 ## 4. Response contract
 
 - [x] 4.1 Carry the optional `page` field through de-duplication, ranking and limiting in `lib/posters.php` without altering the ranking order
-- [x] 4.2 Confirm posters from TMDB, fanart.tv and TheTVDB omit `page` entirely
+- [x] 4.2 Confirm posters from TMDB, fanart.tv and TheTVDB omit `page` entirely — *superseded by group 7, which gives every source a `page` and moves the licence distinction onto `attribution_required`*
 - [x] 4.3 Confirm `total` counts TVmaze posters and that de-duplication still keys on the image URL
 
 ## 5. Tests
@@ -50,3 +50,20 @@
 - [x] 6.4 Spot-check ordering stability — 200 shuffled inputs at unit level including an equal-area tie, plus the live two-request diff in the suite
 - [ ] 6.5 Hand the client-side proposal to the Marquee app session — do this only after `v2` is deployed and answering
 - [x] 6.6 Exercise `marqueeGatherExternalPosters()` directly against live TVmaze, which needs no credential. All nine branches confirmed: show via TVDB id, show via IMDb fallback, no identifier, unknown identifier (`404` → `no_data`), season, absent season, movie, collection, and exclusion by `sources`
+
+## 7. Universal source links
+
+Added after the source work landed: probing showed all four sources can be addressed
+with no extra call and no title-derived slug, so `page` is carried by every source and
+`attribution_required` marks the one case where rendering it is a licence term.
+
+- [x] 7.1 Add web base URL constants for TMDB, fanart.tv and TheTVDB to `lib/config.php`
+- [x] 7.2 Add `marqueeTmdbPage()` building `/movie/{id}`, `/tv/{id}`, `/tv/{id}/season/{n}` and `/collection/{id}`, and carry the result on every TMDB poster
+- [x] 7.3 Add a fanart.tv page builder using the TMDB id for films and the TVDB id for television — the same identifiers already used to call its API — and carry it on every fanart poster
+- [x] 7.4 Capture TheTVDB's `slug` from the payloads already fetched (series artworks, movie extended, series extended on the season path) and carry `/series/{slug}`, `/movies/{slug}` or `/series/{slug}/seasons/official/{n}` on every TheTVDB poster
+- [x] 7.5 Omit `page` rather than guess when a source's identifier or slug is unavailable
+- [x] 7.6 Add `attribution_required: true` to TVmaze posters only, omitted entirely elsewhere
+- [x] 7.7 Extend the unit suite: page built per type for each source, absent when the identifier is missing, and the marker present only on TVmaze
+- [x] 7.8 Extend the live suite: every poster from every source carries a resolvable `page`, season links differ from show links, and only TVmaze is marked
+- [x] 7.9 Re-run both live suites and confirm `v1` still carries neither field
+- [x] 7.10 Update `client-handover.md` — `page` is now universal and `attribution_required` is the field the client keys its obligation on

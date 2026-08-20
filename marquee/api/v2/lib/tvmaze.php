@@ -115,6 +115,10 @@ function marqueeTvmazePosters($images, ?string $page): array
 
         if ($page !== null) {
             $poster['page'] = $page;
+            // CC BY-SA: rendering this link is a licence term, not a courtesy. Every
+            // other source carries `page` as provenance only, so the marker is what
+            // lets a client tell the obligation from the convenience.
+            $poster['attribution_required'] = true;
         }
 
         $posters[] = $poster;
@@ -173,6 +177,7 @@ function marqueeTvmazeSeasonPosters($seasons, int $seasonNumber): array
 
         if (!empty($season['url']) && is_string($season['url'])) {
             $poster['page'] = $season['url'];
+            $poster['attribution_required'] = true;
         }
 
         return [$poster];

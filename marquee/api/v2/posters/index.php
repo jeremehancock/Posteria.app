@@ -322,12 +322,18 @@ if ($request['type'] === 'season') {
 
     $tmdbFailed = $tmdbFailed || !($seasonResponses['images']['ok'] ?? false);
     if ($seasonResponses['images']['ok'] ?? false) {
-        $tmdbPosters = marqueeTmdbPosters($seasonResponses['images']['json']);
+        $tmdbPosters = marqueeTmdbPosters(
+            $seasonResponses['images']['json'],
+            marqueeTmdbPage($request['type'], $winner['tmdb_id'], $request['season'])
+        );
     }
 } else {
     $tmdbFailed = $tmdbFailed || !($workResponses['images']['ok'] ?? false);
     if ($workResponses['images']['ok'] ?? false) {
-        $tmdbPosters = marqueeTmdbPosters($workResponses['images']['json']);
+        $tmdbPosters = marqueeTmdbPosters(
+            $workResponses['images']['json'],
+            marqueeTmdbPage($request['type'], $winner['tmdb_id'], null)
+        );
     }
 }
 

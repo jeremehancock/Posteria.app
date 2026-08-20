@@ -21,6 +21,20 @@ const MARQUEE_ENDPOINT_VERSION = 'v2';
 // during an incident. Everything upstream sees this string.
 const MARQUEE_USER_AGENT = 'Posteria-Marquee-API/2.0';
 
+// Human-facing pages, for each poster's `page` link.
+//
+// Every one is addressed by an identifier the system already holds, never by a slug
+// derived from the title. fanart.tv's canonical URL carries a title slug, but the id
+// alone resolves, so the slug is not constructed — deriving it is unreliable
+// (`It's Always Sunny` slugifies to `its-...`, not `it-s-...`, and accented titles
+// diverge further) and is the exact technique the provenance rules forbid.
+//
+// TheTVDB's `/artwork/{id}` path was tested and is decorative: a real id, a
+// fabricated id and no id at all return byte-identical pages. The work page is used.
+const TMDB_WEB_BASE_URL = 'https://www.themoviedb.org';
+const FANART_WEB_BASE_URL = 'https://fanart.tv';
+const TVDB_WEB_BASE_URL = 'https://thetvdb.com';
+
 // TMDB
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';

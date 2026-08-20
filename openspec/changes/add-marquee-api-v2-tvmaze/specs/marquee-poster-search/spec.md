@@ -31,7 +31,11 @@ Each entry in `posters` SHALL contain:
 - `thumb` — a resolvable absolute URL to a smaller rendition of the same image, present whenever the source can supply one
 - `source` — the source that supplied that specific image
 
-Each entry SHALL additionally carry `width`, `height`, `language` and `score` when the supplying source provides them, and `page` when the supplying source's licence requires a link back to it. `page` SHALL be an absolute URL to that source's page for the work.
+Each entry SHALL additionally carry `width`, `height`, `language` and `score` when the supplying source provides them.
+
+Each entry SHALL carry `page` — an absolute URL to the supplying source's page for the work — wherever that URL can be determined without deriving it from the work's title. An entry whose source page cannot be addressed that way SHALL omit `page` rather than carry a guessed URL.
+
+An entry whose source licence requires the link to be rendered SHALL additionally carry `attribution_required` set to `true`. Entries carrying `page` as provenance only SHALL omit `attribution_required` rather than carry it set to `false`.
 
 A field the source does not supply SHALL be omitted rather than filled with a guessed or duplicated value. In particular, a designation such as "this is the primary image" SHALL NOT be reported as a `score`, because it is not a rating and has no scale comparable to one.
 
@@ -47,25 +51,35 @@ A field the source does not supply SHALL be omitted rather than filled with a gu
 - **WHEN** a source supplies only an image URL
 - **THEN** the poster object carries `url` and `source` and omits the metadata fields it has no value for
 
-#### Scenario: Poster carries an attribution link
+#### Scenario: Every poster carries its source link
 
-- **WHEN** a poster is supplied by a source whose licence requires a link back
-- **THEN** that poster object carries `page` with an absolute URL to that source's page for the work
+- **WHEN** a response contains posters from TMDB, fanart.tv, TheTVDB and TVmaze
+- **THEN** every one carries `page` with an absolute URL to its own source's page for the work
 
-#### Scenario: Attribution link is absent where not required
+#### Scenario: Licence-required link is marked
+
+- **WHEN** a poster is supplied by a source whose licence requires the link to be rendered
+- **THEN** that poster carries `attribution_required: true` alongside `page`
+
+#### Scenario: Provenance link is unmarked
 
 - **WHEN** a poster is supplied by a source that imposes no attribution obligation
-- **THEN** that poster object omits `page` entirely
+- **THEN** that poster carries `page` and omits `attribution_required` entirely
 
 #### Scenario: TVmaze show poster
 
 - **WHEN** a `type=show` response contains a TVmaze poster
-- **THEN** it carries `url`, `thumb`, `width`, `height`, `source` and `page`, and omits `language` and `score`
+- **THEN** it carries `url`, `thumb`, `width`, `height`, `source`, `page` and `attribution_required`, and omits `language` and `score`
 
 #### Scenario: TVmaze season poster
 
 - **WHEN** a `type=season` response contains a TVmaze poster
-- **THEN** it carries `url`, `thumb`, `source` and `page`, and omits `width`, `height`, `language` and `score`, because TVmaze publishes no dimensions for a season image
+- **THEN** it carries `url`, `thumb`, `source`, `page` and `attribution_required`, and omits `width`, `height`, `language` and `score`, because TVmaze publishes no dimensions for a season image
+
+#### Scenario: TMDB poster carries a link but no obligation
+
+- **WHEN** a response contains a TMDB poster
+- **THEN** it carries `page` addressing that work on TMDB, and omits `attribution_required`
 
 ### Requirement: Deterministic ordering and limit
 

@@ -132,6 +132,57 @@ still does real work.
 Rejected for `v2` — it adds a field to the poster contract that one source populates,
 for a change scoped to adding a source.
 
+### Every source carries a link, and the licence-required ones are marked
+
+`page` began as TVmaze's CC BY-SA obligation. Probing the other three showed all of
+them can be addressed with no extra call and no guesswork, so the field is carried by
+every source and a separate `attribution_required` marks the one case where rendering
+it is a licence term rather than a courtesy.
+
+| Source | `page` | Built from | Extra calls |
+| --- | --- | --- | --- |
+| tmdb | `/movie/{id}`, `/tv/{id}`, `/tv/{id}/season/{n}`, `/collection/{id}` | the id already resolved | 0 |
+| fanart.tv | `fanart.tv/movie/{tmdb_id}/`, `fanart.tv/series/{tvdb_id}/` | the same ids used to call its API | 0 |
+| thetvdb | `/series/{slug}`, `/movies/{slug}`, `/series/{slug}/seasons/official/{n}` | `slug`, already in payloads fetched | 0 |
+| tvmaze | show or season `url` | the API response | 0 |
+
+fanart.tv is the strongest case rather than the weakest: its page is keyed on exactly
+the two identifiers already used to fetch its artwork, so the link cannot rot
+independently of the data — if the id were wrong the artwork would be wrong too.
+
+Two findings that shaped the URL forms, both established by probing rather than
+assumption:
+
+- **TheTVDB's `/artwork/{id}` path is decorative.** `/movies/the-matrix/artwork/62278121`,
+  `/movies/the-matrix/artwork/1234567` (a fabricated id) and `/movies/the-matrix` all
+  return byte-identical pages. The apparent per-artwork granularity is an illusion, so
+  the work page is used. A path segment a source accepts but ignores is not a more
+  specific page.
+- **Season pages are real.** `/series/breaking-bad/seasons/official/2` differs from the
+  series page and `404`s on season 99; TMDB's `/tv/1396/season/2` likewise differs from
+  `/tv/1396`. Season requests therefore link to the season where the source publishes
+  one.
+
+*Rejected: slugifying fanart.tv titles.* fanart's canonical URL carries a title slug —
+`fanart.tv/series/75805/its-always-sunny-in-philadelphia/` — but the slug proved to be
+optional; the id alone resolves. That matters, because deriving it was not viable. A
+naive slugifier already disagrees with fanart on the second sample tried
+(`It's Always Sunny` → `it-s-always-sunny…` against the actual `its-always-sunny…`),
+and a rule reverse-engineered to fit both then mangles the next shape it meets
+(`Amélie` → `am-lie`, `8½` → `8`). Constructing it would also be the precise technique
+`marquee-poster-sources` forbids. Dropping the `?section=poster` deep link is the only
+cost of using the id-only form.
+
+*Rejected: a per-source attribution block on `match`.* Smaller payload, but a client
+rendering a subset of `posters` could drop the credit for what it shows, and a season
+poster's correct link differs from the show's.
+
+*Rejected: `page` without a marker.* Compliance would hold only while the client
+rendered every link. A later change showing attribution selectively — in the lightbox
+but not the grid, say — would silently break CC BY-SA with nothing in the payload to
+catch it. `attribution_required` is absent rather than `false` on unmarked posters, per
+the existing rule that an inapplicable field is omitted.
+
 ### Attribution rides on the poster, not on the match
 
 TVmaze data is CC BY-SA and requires a link back to the source. `page` is an optional
