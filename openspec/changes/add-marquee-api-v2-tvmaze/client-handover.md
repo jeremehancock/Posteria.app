@@ -7,6 +7,11 @@ work that produced the `v2` endpoint.
 Referenced by `tasks.md` 6.5. Give it to that session only after `v2` is deployed and
 answering, so the client change can be verified against a live endpoint.
 
+> **Superseded in part.** This prompt was handed over before `page` became universal.
+> A session that has already implemented it needs `client-handover-addendum.md`, which
+> describes the delta. A session starting fresh can use this file as-is — it is
+> current.
+
 ---
 
 ```
