@@ -126,6 +126,11 @@ The system SHALL start and serve requests when any of these variables is unset, 
 - **WHEN** the endpoint is deployed
 - **THEN** it reads the same four environment variables the previous version read, and TVmaze serves without any credential being configured
 
+#### Scenario: Deployed before the new variable is set
+
+- **WHEN** the endpoint is deployed into an environment where `TVDB_API_KEY` is not yet set
+- **THEN** it serves requests normally, reports TheTVDB as `skipped`, does not mark the response `partial`, and the response remains cacheable
+
 #### Scenario: New variable rejected
 
 - **WHEN** `TVDB_API_KEY` is set to a value the provider rejects

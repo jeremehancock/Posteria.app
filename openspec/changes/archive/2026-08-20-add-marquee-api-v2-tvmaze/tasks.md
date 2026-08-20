@@ -48,7 +48,7 @@
 - [x] 6.2 Re-run the `v1` suite unchanged and confirm it still passes — `resolve_test.php` 106 pass, 0 fail; `verify_live.sh` **91 pass, 0 fail**
 - [x] 6.3 Confirm `grep -rn "getenv\|\$_ENV" marquee/api/v2/` lists the same four variables `v1` reads and no others
 - [x] 6.4 Spot-check ordering stability — 200 shuffled inputs at unit level including an equal-area tie, plus the live two-request diff in the suite
-- [ ] 6.5 Hand the client-side proposal to the Marquee app session — do this only after `v2` is deployed and answering
+- [x] 6.5 Hand the client-side proposal to the Marquee app session — handed over, implemented, and verified working against the deployed `v2` endpoint. The first prompt went out before `page` became universal, so a second delta prompt followed it; both are recorded in the commit history rather than kept as files, since the contract they describe now lives in the specs
 - [x] 6.6 Exercise `marqueeGatherExternalPosters()` directly against live TVmaze, which needs no credential. All nine branches confirmed: show via TVDB id, show via IMDb fallback, no identifier, unknown identifier (`404` → `no_data`), season, absent season, movie, collection, and exclusion by `sources`
 
 ## 7. Universal source links
