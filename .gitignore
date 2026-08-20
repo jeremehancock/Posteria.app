@@ -1,5 +1,11 @@
 # Local Claude Code configuration — not part of the deployed site.
 .claude/
 
-# Internal planning documents. Anything committed here is served publicly at
-# posteria.app/<path>, because nixpacks runs `php -S -t .` from the repo root.
+# Internal planning documents are deliberately NOT ignored. openspec/ is tracked on
+# purpose: the proposals, designs and archived changes are the record of why this
+# code looks the way it does, and that belongs in the repository.
+#
+# They are kept off the public site by router.php instead, which is the mechanism
+# that actually works here — nixpacks runs `php -S -t .` from the repo root, so a
+# .gitignore entry would only affect files that were never committed, and every one
+# of these already is. See router.php and tests/router_test.sh.

@@ -1,4 +1,6 @@
 providers = ["php"]
 
 [start]
-cmd = "php -S 0.0.0.0:$PORT -t ."
+# router.php denies the repository paths that are not part of the site
+# (openspec/, test suites, dotfiles). Everything else it passes straight through.
+cmd = "php -S 0.0.0.0:$PORT -t . router.php"
