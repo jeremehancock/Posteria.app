@@ -17,6 +17,10 @@
 >
 > **The legacy API is not.** It still runs, but like Posteria itself it is unmaintained — no new features, fixes, or
 > support.
+>
+> **Security update (October 22, 2026):** both APIs now run on PHP 8.5.12, which fixes the critical PHP2Shell
+> vulnerabilities (CVE-2026-109618 and CVE-2026-109619). Nothing changes for API users: requests and responses are the
+> same, and no action is needed.
 
 This repository contains the landing page for Posteria, a media poster management system. The page is built with HTML, CSS, and vanilla JavaScript.
 
