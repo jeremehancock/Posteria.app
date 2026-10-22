@@ -36,7 +36,7 @@ $internal = [
     '#/tests?(/|$)#i',
 
     // Build and deployment descriptors.
-    '#^/(nixpacks\.toml|Dockerfile|composer\.(json|lock)|package(-lock)?\.json)$#i',
+    '#^/(Dockerfile|composer\.(json|lock)|package(-lock)?\.json)$#i',
     '#^/docker(/|$)#i',
 
     // This file.

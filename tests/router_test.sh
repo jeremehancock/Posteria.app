@@ -84,15 +84,14 @@ chk 404 "/openspec/changes/archive/"
 chk 404 "/marquee/api/v2/tests/verify_live.sh"            "test scripts"
 chk 404 "/marquee/api/v1/tests/verify_live.sh"
 chk 404 "/marquee/api/v2/tests/resolve_test.php"
-chk 404 "/nixpacks.toml"                                  "deploy descriptor"
-chk 404 "/Dockerfile"
+chk 404 "/Dockerfile"                                     "deploy descriptor"
 chk 404 "/docker/php.ini"                                 "container PHP settings"
 chk 404 "/router.php"                                     "the router itself"
 
 echo
 echo "=== dot-prefixed paths are denied ==="
-# .git is not shipped by nixpacks, so this is defence in depth rather than a live
-# exposure. .gitignore and .claude are tracked or present locally.
+# .git is not copied into the image (.dockerignore), so this is defence in depth
+# rather than a live exposure. .gitignore and .claude are tracked or present locally.
 chk 404 "/.git/config"
 chk 404 "/.git/HEAD"
 chk 404 "/.gitignore"

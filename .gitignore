@@ -6,6 +6,6 @@
 # code looks the way it does, and that belongs in the repository.
 #
 # They are kept off the public site by router.php instead, which is the mechanism
-# that actually works here — nixpacks runs `php -S -t .` from the repo root, so a
+# that actually works here: the site runs `php -S -t .` from the repo root, so a
 # .gitignore entry would only affect files that were never committed, and every one
 # of these already is. See router.php and tests/router_test.sh.
