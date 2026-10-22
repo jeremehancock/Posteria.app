@@ -1,0 +1,53 @@
+name: PHP currency
+
+# Is posteria.app running the newest PHP patch release for its version line? Run
+# weekly because the failure this guards against is silent: under nixpacks the
+# site sat on PHP 8.3.15 for about two years and missed the critical PHP2Shell
+# fix (CVE-2026-109618 / CVE-2026-109619) while everything kept working.
+#
+# Checks the live site, not a build, so it also catches a release that was
+# published upstream but never deployed. When it fails, the remedy is a redeploy
+# in Coolify, which rebuilds on the newest php:8.5-cli image.
+# GitHub notifies whoever last edited this schedule when a scheduled run fails.
+on:
+  schedule:
+    - cron: '23 6 * * 1'   # Mondays, 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Live site runs current PHP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read the live site's PHP version
+        id: site
+        run: |
+          # The X-Powered-By header is kept on by docker/php.ini for this check.
+          version=$(curl -fsS -o /dev/null -D - https://posteria.app/api/time.php \
+            | tr -d '\r' | sed -n 's/^[Xx]-[Pp]owered-[Bb]y: *PHP\/\([0-9.]*\).*/\1/p')
+          if [ -z "$version" ]; then
+            echo "::error::Could not read the PHP version from posteria.app"; exit 1
+          fi
+          echo "posteria.app runs PHP ${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with the newest release on that line
+        env:
+          SITE_PHP: ${{ steps.site.outputs.version }}
+        run: |
+          line=$(echo "$SITE_PHP" | cut -d. -f1,2)
+          # An unreachable php.net leaves this empty, which fails the check: an
+          # unknown result is not a clean one.
+          latest=$(curl -fsS "https://www.php.net/releases/index.php?json&version=${line}" \
+            | jq -r '.version // empty' || true)
+          if [ -z "$latest" ]; then
+            echo "::error::Could not read the newest PHP ${line} release from php.net"; exit 1
+          fi
+          if [ "$SITE_PHP" != "$latest" ]; then
+            echo "::error::posteria.app runs PHP ${SITE_PHP}, but ${latest} is out. Redeploy in Coolify."
+            exit 1
+          fi
+          echo "posteria.app is on PHP ${latest}, the newest ${line} release."

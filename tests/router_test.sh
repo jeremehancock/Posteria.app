@@ -3,7 +3,7 @@
 #
 #   bash tests/router_test.sh
 #
-# The router is load-bearing: nixpacks starts the deployment with it, so a mistake
+# The router is load-bearing: the deployment starts with it, so a mistake
 # here takes the whole site down rather than one endpoint. This suite therefore
 # checks both halves of its job — that internal paths are denied, and that
 # everything else is served exactly as it was before the router existed.
@@ -85,6 +85,8 @@ chk 404 "/marquee/api/v2/tests/verify_live.sh"            "test scripts"
 chk 404 "/marquee/api/v1/tests/verify_live.sh"
 chk 404 "/marquee/api/v2/tests/resolve_test.php"
 chk 404 "/nixpacks.toml"                                  "deploy descriptor"
+chk 404 "/Dockerfile"
+chk 404 "/docker/php.ini"                                 "container PHP settings"
 chk 404 "/router.php"                                     "the router itself"
 
 echo

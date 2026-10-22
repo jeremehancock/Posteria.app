@@ -1,9 +1,9 @@
 <?php
 // Request router for the built-in PHP server.
 //
-// nixpacks starts this deployment with `php -S 0.0.0.0:$PORT -t .` from the repo
-// root, which means every tracked file is a URL. That is fine for the site itself
-// and for the API trees, but it also published the OpenSpec planning documents and
+// The deployment starts with `php -S 0.0.0.0:$PORT -t .` from the repo root (see
+// Dockerfile; nixpacks did the same before it), which means every file is a URL.
+// That is fine for the site itself and for the API trees, but it also published the OpenSpec planning documents and
 // the API test scripts at posteria.app/<path> — internal working material that was
 // never meant to be part of the site.
 //
@@ -36,7 +36,8 @@ $internal = [
     '#/tests?(/|$)#i',
 
     // Build and deployment descriptors.
-    '#^/(nixpacks\.toml|composer\.(json|lock)|package(-lock)?\.json)$#i',
+    '#^/(nixpacks\.toml|Dockerfile|composer\.(json|lock)|package(-lock)?\.json)$#i',
+    '#^/docker(/|$)#i',
 
     // This file.
     '#^/router\.php$#i',
