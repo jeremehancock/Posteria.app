@@ -121,7 +121,6 @@ class MarqueeHttpClient
             ];
 
             curl_multi_remove_handle($this->multiHandle, $ch);
-            curl_close($ch);
         }
 
         return $results;
