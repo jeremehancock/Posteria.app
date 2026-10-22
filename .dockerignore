@@ -7,7 +7,6 @@
 .gitignore
 .dockerignore
 Dockerfile
-nixpacks.toml
 openspec
 tests
 **/tests
