@@ -4,6 +4,7 @@
 .git
 .github
 .claude
+.agents
 .gitignore
 .dockerignore
 Dockerfile
